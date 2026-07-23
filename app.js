@@ -71,6 +71,7 @@ const state = {
   remaining: 0,
   endAt: 0,
   paused: false,
+  flying: false,
   timerId: null,
   audioOn: true,
 };
@@ -90,6 +91,117 @@ function pushHistory(entry) {
   const log = getHistory();
   log.unshift(entry);
   storeSet("ff-log", JSON.stringify(log.slice(0, 200)));
+}
+
+/* ---------- Scheduled flights (departures board) ---------- */
+
+const NOSHOW_GRACE_MS = 10 * 60 * 1000;
+
+function getSchedules() {
+  try { return JSON.parse(storeGet("ff-sched", "[]")); } catch (e) { return []; }
+}
+function setSchedules(list) {
+  storeSet("ff-sched", JSON.stringify(list));
+}
+
+function scheduleFlight(ts) {
+  const list = getSchedules();
+  list.push({
+    id: Date.now() + "-" + Math.floor(Math.random() * 1e6),
+    ts,
+    from: state.origin[0],
+    to: state.dest.airport[0],
+    mins: state.dest.mins,
+    km: state.dest.km,
+    airlineId: state.fare.airline.id,
+    cls: state.fare.cls,
+    price: state.fare.price,
+    task: state.task,
+    flightNo: state.flightNo,
+  });
+  list.sort((a, b) => a.ts - b.ts);
+  setSchedules(list);
+  renderBoard();
+}
+
+function cancelScheduled(id) {
+  setSchedules(getSchedules().filter((e) => e.id !== id));
+  renderBoard();
+}
+
+function boardStatus(entry, now) {
+  const dt = entry.ts - now;
+  if (dt > 2 * 60 * 1000) return ["SCHEDULED", "ok"];
+  if (dt > 0) return ["BOARDING", "soon"];
+  return [state.flying ? "DELAYED" : "DEPARTING", "late"];
+}
+
+function renderBoard() {
+  const list = getSchedules();
+  const field = $("board-field");
+  field.hidden = list.length === 0;
+  if (!list.length) return;
+
+  const now = Date.now();
+  const ul = $("board-list");
+  ul.innerHTML = "";
+  for (const e of list) {
+    const al = AIRLINES.find((a) => a.id === e.airlineId);
+    const [txt, cssCls] = boardStatus(e, now);
+    const li = document.createElement("li");
+    li.innerHTML =
+      `<span class="b-time">${new Date(e.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>` +
+      `<span class="b-route">${e.from} → ${e.to}</span>` +
+      `<span class="b-info">${e.flightNo} · ${al ? al.name : ""} ${e.cls}${e.task ? ` · ${e.task}` : ""}</span>` +
+      `<span class="b-status ${cssCls}">${txt}</span>`;
+    const x = document.createElement("button");
+    x.className = "b-cancel";
+    x.title = "Cancel this flight";
+    x.textContent = "✕";
+    x.addEventListener("click", () => cancelScheduled(e.id));
+    li.appendChild(x);
+    ul.appendChild(li);
+  }
+}
+
+function kickScheduled(entry) {
+  cancelScheduled(entry.id);
+  const origin = AIRPORTS.find((a) => a[0] === entry.from);
+  const dest = AIRPORTS.find((a) => a[0] === entry.to);
+  const airline = AIRLINES.find((a) => a.id === entry.airlineId) || AIRLINES[1];
+  if (!origin || !dest) return;
+  state.origin = origin;
+  state.dest = { airport: dest, mins: entry.mins, km: entry.km };
+  state.fare = { airline, cls: entry.cls, price: entry.price };
+  state.task = entry.task || "";
+  state.flightNo = entry.flightNo;
+  playChime();
+  startFlight();
+}
+
+function checkSchedules() {
+  const now = Date.now();
+  const list = getSchedules();
+  if (!list.length) return;
+
+  // Flights missed by more than the grace period become no-shows
+  const missed = list.filter((e) => now - e.ts > NOSHOW_GRACE_MS);
+  for (const e of missed) {
+    pushHistory({
+      ts: e.ts, from: e.from, to: e.to,
+      city: (AIRPORTS.find((a) => a[0] === e.to) || [,, e.to])[2],
+      airline: (AIRLINES.find((a) => a.id === e.airlineId) || {}).name?.split(" ")[0] || "",
+      cls: e.cls, mins: e.mins, focused: 0, km: 0, status: "noshow",
+    });
+  }
+  if (missed.length) setSchedules(list.filter((e) => now - e.ts <= NOSHOW_GRACE_MS));
+
+  // Depart the earliest due flight, unless one is already in the air
+  if (!state.flying) {
+    const due = getSchedules().find((e) => e.ts <= now);
+    if (due) { kickScheduled(due); return; }
+  }
+  renderBoard();
 }
 
 /* ---------- Geometry ---------- */
@@ -368,7 +480,24 @@ function fillTicket() {
   $("t-task").textContent = state.task || "Deep focus";
   $("stub-codes").textContent = `${o[0]} → ${d.airport[0]}`;
   $("stub-flight").textContent = state.flightNo;
+
+  // Default scheduled departure: half an hour out, rounded to 5 min
+  const t = new Date(Date.now() + 30 * 60000);
+  t.setMinutes(Math.ceil(t.getMinutes() / 5) * 5, 0, 0);
+  $("sched-time").value =
+    `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
 }
+
+$("btn-sched").addEventListener("click", () => {
+  const v = $("sched-time").value;
+  if (!v || !state.dest || !state.fare) return;
+  const [h, m] = v.split(":").map(Number);
+  const t = new Date();
+  t.setHours(h, m, 0, 0);
+  if (t.getTime() <= Date.now()) t.setDate(t.getDate() + 1); // past time → tomorrow
+  scheduleFlight(t.getTime());
+  show("screen-book");
+});
 
 $("task-input").addEventListener("input", () => {
   state.task = $("task-input").value.trim();
@@ -402,6 +531,7 @@ function startFlight() {
   state.remaining = state.totalSeconds;
   state.endAt = Date.now() + state.totalSeconds * 1000;
   state.paused = false;
+  state.flying = true;
   divertArmed = false;
 
   $("fl-from").textContent = state.origin[0];
@@ -415,6 +545,18 @@ function startFlight() {
 
   show("screen-flight");
   if (state.audioOn) startAudio();
+  // Scheduled departures may start without a user gesture, which blocks
+  // audio autoplay — invite a tap and restart audio on it.
+  if (navigator.userActivation && !navigator.userActivation.hasBeenActive) {
+    $("btn-audio").textContent = "Tap to start audio";
+    document.addEventListener("click", () => {
+      if (state.flying && state.audioOn) {
+        stopAudio();
+        startAudio();
+        $("btn-audio").textContent = "Cabin audio · on";
+      }
+    }, { once: true });
+  }
   tickFlight();
   state.timerId = setInterval(tickFlight, 250);
 }
@@ -493,6 +635,7 @@ $("btn-divert").addEventListener("click", () => {
 
 function land(completed) {
   clearInterval(state.timerId);
+  state.flying = false;
   stopAudio();
   document.title = "FocusFlight";
 
@@ -573,6 +716,8 @@ function renderHistory() {
     const date = new Date(e.ts).toLocaleDateString([], { month: "short", day: "numeric" });
     const chip = e.status === "landed"
       ? `<span class="chip chip-landed">Landed</span>`
+      : e.status === "noshow"
+      ? `<span class="chip chip-noshow">No-show</span>`
       : `<span class="chip chip-diverted">Diverted</span>`;
     li.innerHTML =
       `<span class="h-date">${date}</span>` +
@@ -598,7 +743,6 @@ let audioNodes = null;   // economy hum
 let ytFrame = null;      // business: youtube iframe
 let padNodes = null;     // business: fallback lounge pad
 let audioSession = 0;    // guards async fallback races
-let ytProbe = null;      // cached reachability check
 
 function ctx() {
   audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
@@ -618,33 +762,29 @@ function stopAudio() {
   stopPad();
 }
 
-function probeYouTube() {
-  if (!ytProbe) {
-    ytProbe = Promise.race([
-      fetch("https://www.youtube.com/favicon.ico", { mode: "no-cors" }).then(() => true, () => false),
-      new Promise((res) => setTimeout(() => res(false), 2500)),
-    ]);
-  }
-  return ytProbe;
-}
-
 function startBusinessAudio() {
   if (ytFrame || padNodes) return;
   const session = ++audioSession;
-  // Create the frame inside the user-gesture call so autoplay is allowed
+  // Hidden audio-only player. Created synchronously so a user-gesture call
+  // (boarding click) grants it autoplay permission.
   const f = document.createElement("iframe");
-  f.src = `https://www.youtube.com/embed/${BUSINESS_YT_ID}?autoplay=1&loop=1&playlist=${BUSINESS_YT_ID}&controls=0`;
+  f.src = `https://www.youtube.com/embed/${BUSINESS_YT_ID}` +
+    `?autoplay=1&loop=1&playlist=${BUSINESS_YT_ID}&controls=0&playsinline=1`;
   f.allow = "autoplay";
   f.setAttribute("aria-hidden", "true");
   f.tabIndex = -1;
-  f.style.cssText = "position:fixed;bottom:0;left:0;width:2px;height:2px;opacity:0.01;border:0;pointer-events:none;";
+  f.style.cssText = "position:fixed;left:-9999px;top:0;width:220px;height:220px;border:0;";
+  let loaded = false;
+  f.addEventListener("load", () => { loaded = true; });
   document.body.appendChild(f);
   ytFrame = f;
-  probeYouTube().then((ok) => {
-    if (ok || session !== audioSession) return;
+  // If the embed never loads (blocked network/CSP/adblock), fall back
+  // to the synthesized lounge pad instead.
+  setTimeout(() => {
+    if (session !== audioSession || loaded) return;
     if (ytFrame) { ytFrame.remove(); ytFrame = null; }
     startPad();
-  });
+  }, 3500);
 }
 
 /* Fallback lounge pad: slow warm chords over a faint hum */
@@ -806,4 +946,6 @@ $("btn-audio").addEventListener("click", () => {
     if (a) setOrigin(a);
   }
   requestAnimationFrame(() => setWheel(25, false));
+  checkSchedules();
+  setInterval(checkSchedules, 5000);
 })();

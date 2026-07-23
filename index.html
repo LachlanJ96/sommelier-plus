@@ -18,6 +18,12 @@
   <main id="screen-book" class="screen active">
     <h1 class="hero">Where will this<br />focus take you?</h1>
 
+    <div class="field" id="board-field" hidden>
+      <span class="label">Departures</span>
+      <ul class="board" id="board-list"></ul>
+      <span class="fine">Scheduled flights depart on time while FocusFlight is open.</span>
+    </div>
+
     <div class="field">
       <span class="label">Departing from</span>
       <div class="search-wrap">
@@ -40,6 +46,7 @@
       <span class="label">In range from <span id="range-origin"></span></span>
       <ul class="dest-list" id="dest-list"></ul>
     </div>
+
   </main>
 
   <!-- ============ FARE ============ -->
@@ -109,6 +116,12 @@
     <div class="ticket-actions">
       <button class="btn-text" id="btn-back">← Change flight</button>
       <button class="btn-solid" id="btn-tear">Tear ticket · Board</button>
+    </div>
+
+    <div class="sched-row">
+      <span class="fine">Or schedule departure:</span>
+      <input type="time" id="sched-time" class="mono" />
+      <button class="btn-text btn-underline" id="btn-sched">Add to departures board</button>
     </div>
   </main>
 
