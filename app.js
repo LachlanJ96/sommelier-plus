@@ -782,6 +782,42 @@ function projPoint(lat, lon, w, h) {
   ];
 }
 
+/* Precomputed bounding boxes for geography culling */
+let worldBBoxes = null;
+function ensureWorldBBoxes() {
+  if (worldBBoxes || typeof WORLD_LAND === "undefined") return;
+  const boxes = (set) => set.map((flat) => {
+    let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+    for (let i = 0; i < flat.length; i += 2) {
+      if (flat[i] < minLon) minLon = flat[i];
+      if (flat[i] > maxLon) maxLon = flat[i];
+      if (flat[i + 1] < minLat) minLat = flat[i + 1];
+      if (flat[i + 1] > maxLat) maxLat = flat[i + 1];
+    }
+    return [minLon, minLat, maxLon, maxLat];
+  });
+  worldBBoxes = { land: boxes(WORLD_LAND), borders: boxes(WORLD_BORDERS) };
+}
+
+function drawGeoSet(ctx2d, set, bbs, b, w, h, fill) {
+  for (const lonOff of [-360, 0, 360]) {
+    for (let r = 0; r < set.length; r++) {
+      const bb = bbs[r];
+      if (bb[0] + lonOff > b.maxLon || bb[2] + lonOff < b.minLon ||
+          bb[1] > b.maxLat || bb[3] < b.minLat) continue;
+      const flat = set[r];
+      ctx2d.beginPath();
+      for (let i = 0; i < flat.length; i += 2) {
+        const x = ((flat[i] + lonOff - b.minLon) / (b.maxLon - b.minLon)) * w;
+        const y = ((b.maxLat - flat[i + 1]) / (b.maxLat - b.minLat)) * h;
+        i === 0 ? ctx2d.moveTo(x, y) : ctx2d.lineTo(x, y);
+      }
+      if (fill) { ctx2d.closePath(); ctx2d.fill(); }
+      ctx2d.stroke();
+    }
+  }
+}
+
 function drawFlightMap(progress) {
   const canvas = $("fl-map");
   if (!flMap.full || !canvas.width) return;
@@ -791,6 +827,19 @@ function drawFlightMap(progress) {
   const b = flMap.bounds;
   const px = (n) => n * flMap.dpr;
   ctx2d.clearRect(0, 0, w, h);
+
+  // Real geography: ocean wash, landmasses with coastlines, country borders
+  ensureWorldBBoxes();
+  if (worldBBoxes) {
+    ctx2d.fillStyle = "rgba(10, 22, 40, 0.55)";
+    ctx2d.fillRect(0, 0, w, h);
+    ctx2d.fillStyle = "rgba(92, 138, 190, 0.16)";
+    ctx2d.strokeStyle = "rgba(150, 205, 255, 0.32)";
+    ctx2d.lineWidth = px(1);
+    drawGeoSet(ctx2d, WORLD_LAND, worldBBoxes.land, b, w, h, true);
+    ctx2d.strokeStyle = "rgba(150, 205, 255, 0.12)";
+    drawGeoSet(ctx2d, WORLD_BORDERS, worldBBoxes.borders, b, w, h, false);
+  }
 
   // Graticule
   ctx2d.strokeStyle = "rgba(140, 200, 255, 0.09)";
