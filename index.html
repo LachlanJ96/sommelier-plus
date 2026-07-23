@@ -3,132 +3,169 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FocusFlight — book a flight, land your focus</title>
+  <title>FocusFlight</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✈️</text></svg>" />
 </head>
 <body>
 
-  <!-- ============ BOOKING SCREEN ============ -->
-  <section id="screen-booking" class="screen active">
-    <header class="brand">
-      <div class="brand-logo">✈</div>
-      <h1>FocusFlight</h1>
-      <p class="tagline">Book a flight. Put your phone in airplane mode. Land your focus.</p>
-    </header>
+  <header class="top" id="top-bar">
+    <span class="wordmark">FOCUS<b>FLIGHT</b></span>
+    <button class="nav-link" id="nav-history">History</button>
+  </header>
 
-    <div class="booking-card">
-      <div class="route-header">
-        <div class="airport">
-          <span class="airport-code">DTR</span>
-          <span class="airport-name">Distraction Intl.</span>
-        </div>
-        <div class="route-arrow">→</div>
-        <div class="airport">
-          <span class="airport-code" id="picked-code">···</span>
-          <span class="airport-name" id="picked-city">Choose a destination</span>
-        </div>
+  <!-- ============ BOOK ============ -->
+  <main id="screen-book" class="screen active">
+    <h1 class="hero">Where will this<br />focus take you?</h1>
+
+    <div class="field">
+      <span class="label">Departing from</span>
+      <div class="search-wrap">
+        <input id="origin-input" type="text" autocomplete="off" spellcheck="false"
+               placeholder="Search any airport — city, name or code" />
+        <ul id="origin-results" class="dropdown" hidden></ul>
       </div>
-
-      <p class="section-label">Destinations · flight time = focus time</p>
-      <div class="destinations" id="destinations"></div>
-
-      <div class="custom-row">
-        <label for="custom-minutes">Or charter your own flight:</label>
-        <input type="number" id="custom-minutes" min="1" max="360" placeholder="minutes" />
-        <button class="btn-ghost" id="btn-charter">Charter</button>
-      </div>
-
-      <div class="task-row">
-        <label for="task-input">What are you focusing on this flight?</label>
-        <input type="text" id="task-input" maxlength="60" placeholder="e.g. Write the report" />
-      </div>
-
-      <button class="btn-primary" id="btn-book" disabled>Book ticket</button>
-
-      <p class="miles" id="miles-flown"></p>
+      <span class="fine" id="airport-count"></span>
     </div>
-  </section>
 
-  <!-- ============ BOARDING PASS SCREEN ============ -->
-  <section id="screen-ticket" class="screen">
+    <div class="field" id="time-field" hidden>
+      <span class="label">Flight time <em id="range-hint" class="range-hint"></em></span>
+      <div class="wheel-frame">
+        <div class="wheel" id="wheel" tabindex="0" aria-label="Focus duration"></div>
+        <div class="wheel-cursor" aria-hidden="true"></div>
+      </div>
+    </div>
+
+    <div class="field" id="dest-field" hidden>
+      <span class="label">In range from <span id="range-origin"></span></span>
+      <ul class="dest-list" id="dest-list"></ul>
+    </div>
+  </main>
+
+  <!-- ============ TICKET ============ -->
+  <main id="screen-ticket" class="screen">
     <div class="ticket" id="ticket">
       <div class="ticket-main">
-        <div class="ticket-top">
-          <span class="ticket-airline">✈ FOCUSFLIGHT AIRWAYS</span>
-          <span class="ticket-class">DEEP FOCUS CLASS</span>
+        <div class="ticket-head">
+          <span class="ticket-airline">FOCUSFLIGHT</span>
+          <span class="ticket-no mono" id="t-flight">FF 212</span>
         </div>
         <div class="ticket-route">
-          <div>
-            <span class="t-code">DTR</span>
-            <span class="t-city">Distraction Intl.</span>
+          <div class="t-end">
+            <span class="t-code" id="t-from-code">···</span>
+            <span class="t-city" id="t-from-city"></span>
           </div>
-          <div class="t-plane">— ✈ —</div>
-          <div>
-            <span class="t-code" id="t-dest-code">SFO</span>
-            <span class="t-city" id="t-dest-city">San Francisco</span>
+          <svg class="t-arc" viewBox="0 0 120 32" aria-hidden="true">
+            <path d="M4 28 Q60 -8 116 28" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 4"/>
+            <circle cx="60" cy="10" r="2.4" fill="currentColor"/>
+          </svg>
+          <div class="t-end t-end-right">
+            <span class="t-code" id="t-to-code">···</span>
+            <span class="t-city" id="t-to-city"></span>
           </div>
         </div>
-        <div class="ticket-grid">
-          <div><span class="t-label">Passenger</span><span class="t-value" id="t-passenger">FOCUSED TRAVELLER</span></div>
-          <div><span class="t-label">Flight</span><span class="t-value" id="t-flight">FF 214</span></div>
-          <div><span class="t-label">Gate</span><span class="t-value" id="t-gate">B7</span></div>
-          <div><span class="t-label">Seat</span><span class="t-value" id="t-seat">12A</span></div>
-          <div><span class="t-label">Flight time</span><span class="t-value" id="t-duration">25 MIN</span></div>
-          <div><span class="t-label">Mission</span><span class="t-value" id="t-task">—</span></div>
+        <div class="ticket-grid mono">
+          <div><span class="g-label">Departs</span><span id="t-dep">—</span></div>
+          <div><span class="g-label">Arrives</span><span id="t-arr">—</span></div>
+          <div><span class="g-label">Duration</span><span id="t-dur">—</span></div>
+          <div><span class="g-label">Distance</span><span id="t-dist">—</span></div>
+          <div><span class="g-label">Gate</span><span id="t-gate">—</span></div>
+          <div><span class="g-label">Seat</span><span id="t-seat">—</span></div>
+        </div>
+        <div class="ticket-mission">
+          <span class="g-label">Mission</span>
+          <span id="t-task" class="t-task-line">Deep focus</span>
         </div>
       </div>
       <div class="ticket-stub">
-        <span class="stub-code" id="stub-code">SFO</span>
-        <span class="stub-flight" id="stub-flight">FF 214</span>
-        <div class="barcode"></div>
+        <div class="stub-top mono">
+          <span id="stub-codes">··· → ···</span>
+          <span id="stub-flight">FF 212</span>
+        </div>
+        <div class="barcode" aria-hidden="true"></div>
+        <span class="stub-note">TEAR TO BOARD</span>
       </div>
+    </div>
+
+    <div class="mission-row">
+      <input id="task-input" type="text" maxlength="60" autocomplete="off"
+             placeholder="Write your mission on the ticket (optional)" />
     </div>
 
     <div class="ticket-actions">
-      <button class="btn-ghost" id="btn-back">← Change flight</button>
-      <button class="btn-primary" id="btn-board">Board &amp; take off</button>
+      <button class="btn-text" id="btn-back">← Change flight</button>
+      <button class="btn-solid" id="btn-tear">Tear ticket · Board</button>
     </div>
-    <p class="hint">Tip: put your phone in airplane mode for real. ✈</p>
-  </section>
+  </main>
 
-  <!-- ============ FLIGHT SCREEN ============ -->
-  <section id="screen-flight" class="screen">
-    <div class="sky" id="sky">
-      <div class="stars"></div>
-      <div class="clouds clouds-far"></div>
-      <div class="clouds clouds-near"></div>
-      <div class="plane-wrap"><div class="plane">✈</div></div>
-    </div>
+  <!-- ============ FLIGHT ============ -->
+  <div id="screen-flight" class="screen flight">
+    <div class="fl-stars" aria-hidden="true"></div>
 
-    <div class="hud">
-      <div class="hud-route">
-        <span>DTR</span>
-        <div class="hud-track"><div class="hud-progress" id="hud-progress"></div><div class="hud-dot" id="hud-dot">✈</div></div>
-        <span id="hud-dest">SFO</span>
+    <div class="fl-route mono">
+      <span id="fl-from">···</span>
+      <div class="fl-track">
+        <div class="fl-progress" id="fl-progress"></div>
+        <div class="fl-marker" id="fl-marker"></div>
       </div>
-      <div class="hud-timer" id="hud-timer">25:00</div>
-      <div class="hud-task" id="hud-task"></div>
-      <div class="hud-status" id="hud-status">Cruising at 36,000 ft</div>
-      <div class="hud-controls">
-        <button class="btn-hud" id="btn-audio" title="Cabin ambience">🔊 Cabin audio</button>
-        <button class="btn-hud" id="btn-pause">⏸ Hold</button>
-        <button class="btn-hud btn-danger" id="btn-divert">Divert ✕</button>
+      <span id="fl-to">···</span>
+    </div>
+
+    <div class="fl-center">
+      <span class="fl-phase" id="fl-phase">BOARDING</span>
+      <div class="fl-timer mono" id="fl-timer">00:00</div>
+      <p class="fl-task" id="fl-task"></p>
+    </div>
+
+    <div class="fl-telemetry mono" id="fl-telemetry">
+      <span>ALT <b id="tel-alt">0</b> M</span>
+      <span>GS <b id="tel-spd">0</b> KM/H</span>
+      <span><b id="tel-togo">—</b> KM TO GO</span>
+    </div>
+
+    <div class="fl-controls">
+      <button class="btn-fl" id="btn-audio">Cabin audio · on</button>
+      <button class="btn-fl" id="btn-hold">Hold</button>
+      <button class="btn-fl btn-fl-danger" id="btn-divert">Divert</button>
+    </div>
+
+    <!-- News alert overlay -->
+    <div class="news" id="news" hidden>
+      <div class="news-bar">
+        <span class="news-badge">NEWS ALERT</span>
+        <p class="news-text" id="news-text"></p>
       </div>
     </div>
-  </section>
+  </div>
 
-  <!-- ============ ARRIVAL SCREEN ============ -->
-  <section id="screen-arrival" class="screen">
-    <div class="arrival-card">
-      <div class="arrival-emoji">🛬</div>
-      <h2 id="arrival-title">Welcome to San Francisco</h2>
-      <p id="arrival-sub">You focused for 25 minutes without leaving your seat.</p>
-      <p class="arrival-miles" id="arrival-miles"></p>
-      <button class="btn-primary" id="btn-again">Book another flight</button>
+  <!-- ============ ARRIVAL ============ -->
+  <main id="screen-arrival" class="screen">
+    <div class="arrival">
+      <span class="label" id="arr-label">Arrived</span>
+      <h2 class="arr-title" id="arr-title">Landed</h2>
+      <p class="arr-sub" id="arr-sub"></p>
+      <p class="arr-total mono" id="arr-total"></p>
+      <div class="arr-actions">
+        <button class="btn-solid" id="btn-again">New flight</button>
+        <button class="btn-text" id="btn-see-history">History</button>
+      </div>
     </div>
-  </section>
+  </main>
 
+  <!-- ============ HISTORY ============ -->
+  <main id="screen-history" class="screen">
+    <div class="history">
+      <div class="history-head">
+        <h2>Flight log</h2>
+        <span class="fine mono" id="log-total"></span>
+      </div>
+      <ul id="history-list" class="history-list"></ul>
+      <p class="fine" id="history-empty" hidden>No flights yet. Your landed and diverted tickets will appear here.</p>
+      <button class="btn-text" id="btn-log-back">← Back</button>
+    </div>
+  </main>
+
+  <script src="airports.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

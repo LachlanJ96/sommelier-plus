@@ -1,29 +1,29 @@
 # ✈ FocusFlight
 
-A flight-themed deep-focus timer, inspired by [focusflight.net](https://focusflight.net).
-
-Book a ticket, pick a destination, board — and a full-screen flight runs your
-focus session with cabin ambience until you land.
+A minimalist, flight-themed deep-focus timer inspired by [focusflight.net](https://focusflight.net).
 
 ## How it works
 
-1. **Book** — choose a destination (each one is a focus length, from a 10-min
-   hop to a 3-hour ultra), or charter a custom duration. Optionally note what
-   you're working on.
-2. **Boarding pass** — you get a ticket with a flight number, gate and seat.
-3. **Fly** — full-screen sky with drifting clouds, a countdown timer, and a
-   route progress bar. The sky shifts from day to dusk to night as you cruise.
-   Cabin ambience (engine hum + air rush) is generated in the browser with the
-   Web Audio API — no audio files needed.
-4. **Land** — a cabin chime plays, and you arrive. Focused minutes accumulate
-   into lifetime "focus miles" (stored in localStorage).
-
-Pause = holding pattern. Quitting early = diverting the flight (partial
-minutes still count).
+1. **Book** — search any of 300+ real world airports as your origin, then scroll
+   the time wheel to your focus length. The app computes which airports are
+   actually in range (haversine distance at ~900 km/h cruise) and lists them
+   with real distances and flight times.
+2. **Ticket** — a boarding pass is issued with flight number, gate, seat,
+   departure/arrival times, and your mission written on it.
+3. **Tear & board** — the ticket physically tears along the perforation
+   (with a paper-tear sound), and the flight begins.
+4. **Fly** — a dark flight-deck screen: thin-numeral countdown, route progress
+   line, live telemetry (altitude, ground speed, km to go), and flight phases
+   (climb → cruise → descent → final approach). Cabin ambience is synthesized
+   with the Web Audio API — no audio files.
+5. **Divert** — quitting early triggers a breaking-news alert before logging
+   the flight as diverted. Landing plays the cabin chime.
+6. **Flight log** — every ticket is kept in history with a LANDED or DIVERTED
+   status, plus lifetime focused minutes and kilometres flown (localStorage).
 
 ## Running it
 
-No build step, no dependencies — it's plain HTML/CSS/JS:
+No build step, no dependencies — plain HTML/CSS/JS:
 
 ```sh
 open index.html        # or just double-click it
