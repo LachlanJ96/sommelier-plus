@@ -846,11 +846,16 @@ function startBusinessAudio() {
     if (typeof d === "string") { try { d = JSON.parse(d); } catch (err) { return; } }
     if (!d) return;
     if (d.event === "onReady") send({ event: "command", func: "playVideo", args: [] });
-    // playerState 1 = playing, 3 = buffering
+    // playerState: 1 playing, 3 buffering, 0 ended
     const s = d.info && typeof d.info === "object" ? d.info.playerState : undefined;
     if (s === 1 || s === 3) {
       playing = true;
       wrap.classList.remove("visible"); // music confirmed — tuck away
+    }
+    if (s === 0) {
+      // The loop=1 param is unreliable in embeds — restart the track ourselves
+      send({ event: "command", func: "seekTo", args: [0, true] });
+      send({ event: "command", func: "playVideo", args: [] });
     }
   };
   window.addEventListener("message", ytMsgHandler);
