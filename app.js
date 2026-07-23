@@ -563,7 +563,39 @@ function startFlight() {
   runPreflight(beginCruise);
 }
 
-/* Doors closing → safety briefing → takeoff, then the clock starts */
+/* Doors closing → safety briefing → takeoff, then the clock starts.
+   Each phase is driven by its cabin announcement and advances when the
+   clip ends; if a clip can't play, timed fallbacks keep things moving. */
+
+const ANNOUNCEMENTS = typeof ANNOUNCEMENT_DATA !== "undefined" ? ANNOUNCEMENT_DATA : {
+  doors: "announcements/doors-arm.mp3",
+  safety: "announcements/safety-briefing.mp3",
+  captain: "announcements/captain-takeoff.mp3",
+};
+
+let currentAnn = null;
+function playAnnouncement(name, fallbackMs, cb) {
+  let advanced = false;
+  const next = () => {
+    if (advanced) return;
+    advanced = true;
+    currentAnn = null;
+    cb();
+  };
+  let a;
+  try { a = new Audio(ANNOUNCEMENTS[name]); } catch (e) { setTimeout(next, fallbackMs); return; }
+  currentAnn = a;
+  a.addEventListener("ended", () => setTimeout(next, 500));
+  a.addEventListener("error", () => setTimeout(next, fallbackMs));
+  const p = a.play();
+  if (p && p.catch) p.catch(() => setTimeout(next, fallbackMs));
+}
+function stopAnnouncement() {
+  if (currentAnn) {
+    try { currentAnn.pause(); } catch (e) { /* already gone */ }
+    currentAnn = null;
+  }
+}
 
 let preflightTimers = [];
 function runPreflight(done) {
@@ -573,6 +605,7 @@ function runPreflight(done) {
   const finish = () => {
     if (finished) return;
     finished = true;
+    stopAnnouncement();
     preflightTimers.forEach(clearTimeout);
     preflightTimers = [];
     pf.classList.add("done");
@@ -580,32 +613,39 @@ function runPreflight(done) {
     preflightTimers.push(setTimeout(() => { pf.hidden = true; }, 850));
     done();
   };
+  const guard = (fn) => () => { if (!finished) fn(); };
 
   pf.classList.remove("closed", "done");
   $("screen-flight").classList.add("boarding");
   belt.setAttribute("hidden", "");
   label.textContent = "CABIN DOORS CLOSING";
-  sub.textContent = "Stow your distractions in the overhead locker";
+  sub.textContent = "Cabin crew, arm doors and cross-check";
   pf.hidden = false;
   $("pf-skip").onclick = finish;
 
   preflightTimers.forEach(clearTimeout);
-  preflightTimers = [
-    setTimeout(() => pf.classList.add("closed"), 60),
-    setTimeout(() => {
-      playChime();
-      belt.removeAttribute("hidden");
-      label.textContent = "SAFETY BRIEFING IN PROGRESS";
-      sub.textContent = "Your nearest focus exit may be behind you";
-    }, 2400),
-    setTimeout(() => {
-      belt.setAttribute("hidden", "");
-      label.textContent = "CLEARED FOR TAKEOFF";
+  preflightTimers = [setTimeout(() => pf.classList.add("closed"), 60)];
+
+  const takeoff = guard(() => {
+    belt.setAttribute("hidden", "");
+    label.textContent = "CLEARED FOR TAKEOFF";
+    sub.textContent = "Captain's announcement";
+    playAnnouncement("captain", 2000, guard(() => {
       sub.textContent = "V1 — rotate";
       playSpool();
-    }, 6200),
-    setTimeout(finish, 8200),
-  ];
+      preflightTimers.push(setTimeout(finish, 2000));
+    }));
+  });
+
+  const briefing = guard(() => {
+    playChime();
+    belt.removeAttribute("hidden");
+    label.textContent = "SAFETY BRIEFING IN PROGRESS";
+    sub.textContent = "Your nearest focus exit may be behind you";
+    playAnnouncement("safety", 3800, takeoff);
+  });
+
+  playAnnouncement("doors", 2400, briefing);
 }
 
 function beginCruise() {
