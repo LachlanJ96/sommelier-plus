@@ -709,26 +709,10 @@ function greatCirclePath(a, b, n) {
   return pts;
 }
 
-function setupFlightMap() {
-  const canvas = $("fl-map");
-  flMap.path = greatCirclePath(state.origin, state.dest.airport, 72);
-
-  let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
-  for (const [lat, lon] of flMap.path) {
-    minLat = Math.min(minLat, lat); maxLat = Math.max(maxLat, lat);
-    minLon = Math.min(minLon, lon); maxLon = Math.max(maxLon, lon);
-  }
-  // Padding plus minimum spans so short hops still show context
-  let latSpan = Math.max(maxLat - minLat, 6), lonSpan = Math.max(maxLon - minLon, 8);
-  minLat -= latSpan * 0.35; maxLat += latSpan * 0.35;
-  minLon -= lonSpan * 0.3; maxLon += lonSpan * 0.3;
-  latSpan = maxLat - minLat; lonSpan = maxLon - minLon;
-
-  // Expand one axis so map proportions match the canvas
-  const rect = canvas.parentElement.getBoundingClientRect();
-  const aspect = rect.width / rect.height;
+function fitAspect(minLat, maxLat, minLon, maxLon, aspect) {
   const midLat = (minLat + maxLat) / 2;
   const kx = Math.max(0.2, Math.cos(midLat * Math.PI / 180));
+  const latSpan = maxLat - minLat, lonSpan = maxLon - minLon;
   const visAspect = (lonSpan * kx) / latSpan;
   if (visAspect < aspect) {
     const need = (latSpan * aspect) / kx;
@@ -739,11 +723,55 @@ function setupFlightMap() {
     const grow = (need - latSpan) / 2;
     minLat -= grow; maxLat += grow;
   }
-  flMap.bounds = { minLat, maxLat, minLon, maxLon };
+  return { minLat, maxLat, minLon, maxLon };
+}
+
+function boundsAroundAirport(lat, lon, aspect) {
+  // Tight "on the tarmac" framing
+  return fitAspect(lat - 1.6, lat + 1.6, lon - 2.2, lon + 2.2, aspect);
+}
+
+function setupFlightMap() {
+  const canvas = $("fl-map");
+  flMap.path = greatCirclePath(state.origin, state.dest.airport, 72);
+
+  let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+  for (const [lat, lon] of flMap.path) {
+    minLat = Math.min(minLat, lat); maxLat = Math.max(maxLat, lat);
+    minLon = Math.min(minLon, lon); maxLon = Math.max(maxLon, lon);
+  }
+  // Padding plus minimum spans so short hops still show context
+  const latSpan = Math.max(maxLat - minLat, 6), lonSpan = Math.max(maxLon - minLon, 8);
+  minLat -= latSpan * 0.35; maxLat += latSpan * 0.35;
+  minLon -= lonSpan * 0.3; maxLon += lonSpan * 0.3;
+
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const aspect = rect.width / rect.height;
+  flMap.full = fitAspect(minLat, maxLat, minLon, maxLon, aspect);
+  // Close-ups for takeoff and approach; path lons are unwrapped, so use them
+  flMap.o = boundsAroundAirport(flMap.path[0][0], flMap.path[0][1], aspect);
+  flMap.d = boundsAroundAirport(flMap.path[flMap.path.length - 1][0], flMap.path[flMap.path.length - 1][1], aspect);
+  flMap.bounds = flMap.o;
 
   flMap.dpr = window.devicePixelRatio || 1;
   canvas.width = Math.round(rect.width * flMap.dpr);
   canvas.height = Math.round(rect.height * flMap.dpr);
+}
+
+/* Camera: tight on the departure airport, pulling out to the whole route
+   through the climb, then diving onto the arrival airport for approach */
+function currentBounds(p) {
+  const smooth = (t) => t * t * (3 - 2 * t);
+  const lerpB = (a, b, t) => ({
+    minLat: a.minLat + (b.minLat - a.minLat) * t,
+    maxLat: a.maxLat + (b.maxLat - a.maxLat) * t,
+    minLon: a.minLon + (b.minLon - a.minLon) * t,
+    maxLon: a.maxLon + (b.maxLon - a.maxLon) * t,
+  });
+  const CLIMB_END = 0.12, DESCENT_START = 0.85;
+  if (p <= CLIMB_END) return lerpB(flMap.o, flMap.full, smooth(p / CLIMB_END));
+  if (p >= DESCENT_START) return lerpB(flMap.full, flMap.d, smooth((p - DESCENT_START) / (1 - DESCENT_START)));
+  return flMap.full;
 }
 
 function projPoint(lat, lon, w, h) {
@@ -756,7 +784,8 @@ function projPoint(lat, lon, w, h) {
 
 function drawFlightMap(progress) {
   const canvas = $("fl-map");
-  if (!flMap.bounds || !canvas.width) return;
+  if (!flMap.full || !canvas.width) return;
+  flMap.bounds = currentBounds(progress);
   const ctx2d = canvas.getContext("2d");
   const w = canvas.width, h = canvas.height;
   const b = flMap.bounds;
@@ -766,8 +795,9 @@ function drawFlightMap(progress) {
   // Graticule
   ctx2d.strokeStyle = "rgba(140, 200, 255, 0.09)";
   ctx2d.lineWidth = px(1);
-  const lonStep = (b.maxLon - b.minLon) > 60 ? 20 : (b.maxLon - b.minLon) > 20 ? 10 : 5;
-  const latStep = (b.maxLat - b.minLat) > 40 ? 20 : (b.maxLat - b.minLat) > 15 ? 10 : 5;
+  const spanLon = b.maxLon - b.minLon, spanLat = b.maxLat - b.minLat;
+  const lonStep = spanLon > 60 ? 20 : spanLon > 20 ? 10 : spanLon > 8 ? 5 : 1;
+  const latStep = spanLat > 40 ? 20 : spanLat > 15 ? 10 : spanLat > 6 ? 5 : 1;
   for (let lon = Math.ceil(b.minLon / lonStep) * lonStep; lon <= b.maxLon; lon += lonStep) {
     const [x] = projPoint(0, lon, w, h);
     ctx2d.beginPath(); ctx2d.moveTo(x, 0); ctx2d.lineTo(x, h); ctx2d.stroke();
@@ -921,7 +951,7 @@ function tickFlight() {
 }
 
 window.addEventListener("resize", () => {
-  if (state.flying && flMap.bounds) {
+  if (state.flying && flMap.full) {
     setupFlightMap();
     drawFlightMap(progressNow());
   }
