@@ -386,23 +386,49 @@ main.screen.active {
   font-size: 0.82rem; letter-spacing: 0.14em;
 }
 .fl-track { position: relative; flex: 1; height: 1px; background: rgba(242,242,239,0.22); }
-.fl-progress { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: #F2F2EF; transition: width 1s linear; }
+.fl-progress { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: #9CCBFF; box-shadow: 0 0 10px rgba(140,200,255,0.7); transition: width 1s linear; }
 .fl-marker {
   position: absolute; top: 50%; left: 0%;
   width: 7px; height: 7px; border-radius: 50%;
-  background: #F2F2EF; transform: translate(-50%, -50%);
-  box-shadow: 0 0 12px rgba(242,242,239,0.9);
+  background: #CFE9FF; transform: translate(-50%, -50%);
+  box-shadow: 0 0 14px rgba(140,200,255,0.95);
   transition: left 1s linear;
 }
 
+/* Live route map — seat-back tracker style */
+.fl-map-wrap {
+  position: relative; z-index: 2;
+  width: min(760px, 96vw); height: clamp(180px, 34vh, 340px);
+}
+#fl-map { width: 100%; height: 100%; display: block; }
+
 .fl-center { position: relative; z-index: 2; text-align: center; }
+
+/* Phase change flash */
+.phase-flash {
+  position: absolute; inset: 0; z-index: 24;
+  display: flex; align-items: center; justify-content: center;
+  font-size: clamp(1.4rem, 5vw, 2.6rem); letter-spacing: 0.5em;
+  color: #CFE9FF; text-shadow: 0 0 24px rgba(140, 200, 255, 0.8);
+  pointer-events: none; text-align: center; padding: 0 1rem;
+}
+.phase-flash[hidden] { display: none; }
+.phase-flash.show { animation: phase-flash 2.6s ease-out forwards; }
+@keyframes phase-flash {
+  0% { opacity: 0; transform: scale(0.92); filter: blur(6px); }
+  12% { opacity: 1; transform: scale(1); filter: blur(0); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.05); filter: blur(3px); }
+}
 .fl-phase {
   font-size: 0.64rem; letter-spacing: 0.34em; text-transform: uppercase;
   color: rgba(242,242,239,0.55);
 }
 .fl-timer {
-  font-size: clamp(4.2rem, 17vw, 9rem);
+  font-size: clamp(3.4rem, 13vw, 7rem);
   font-weight: 200; line-height: 1.05; letter-spacing: 0.01em;
+  color: #EAF4FF;
+  text-shadow: 0 0 34px rgba(140, 200, 255, 0.35), 0 0 90px rgba(140, 200, 255, 0.15);
 }
 .fl-task { font-size: 0.95rem; color: rgba(242,242,239,0.75); min-height: 1.3em; font-weight: 300; }
 .fl-fare { font-size: 0.64rem; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(242,242,239,0.4); margin-top: 0.5rem; }
@@ -477,9 +503,10 @@ main.screen.active {
 .pf-belt[hidden] { display: none; }
 
 /* Keep the flight deck dark until the doors sequence finishes */
-.fl-route, .fl-center, .fl-telemetry, .fl-controls { transition: opacity 0.8s ease; }
+.fl-route, .fl-center, .fl-telemetry, .fl-controls, .fl-map-wrap { transition: opacity 0.8s ease; }
 .flight.boarding .fl-route, .flight.boarding .fl-center,
-.flight.boarding .fl-telemetry, .flight.boarding .fl-controls { opacity: 0; }
+.flight.boarding .fl-telemetry, .flight.boarding .fl-controls,
+.flight.boarding .fl-map-wrap { opacity: 0; }
 @keyframes belt-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
 .pf-label { font-size: 1rem; letter-spacing: 0.34em; color: #F2F2EF; }
 .pf-sub { font-size: 0.82rem; color: rgba(242,242,239,0.55); font-weight: 300; }

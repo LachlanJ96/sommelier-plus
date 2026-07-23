@@ -546,7 +546,10 @@ function startFlight() {
   $("btn-divert").classList.remove("armed");
   $("news").hidden = true;
 
+  lastFlashPhase = "";
   show("screen-flight");
+  setupFlightMap();
+  drawFlightMap(0);
   // Start audio inside the boarding gesture so autoplay is permitted;
   // the pre-flight sequence plays over it.
   if (state.audioOn) startAudio();
@@ -651,12 +654,220 @@ function runPreflight(done) {
 function beginCruise() {
   if (!state.flying || state.timerId) return;
   state.endAt = Date.now() + state.totalSeconds * 1000;
+  flashPhase("TAKEOFF");
   tickFlight();
   state.timerId = setInterval(tickFlight, 250);
 }
 
 function progressNow() {
   return 1 - state.remaining / state.totalSeconds;
+}
+
+/* ---------- Route map (seat-back tracker, self-contained canvas) ---------- */
+
+const flMap = { path: [], bounds: null, dpr: 1 };
+
+function toVec(lat, lon) {
+  const la = lat * Math.PI / 180, lo = lon * Math.PI / 180;
+  return [Math.cos(la) * Math.cos(lo), Math.cos(la) * Math.sin(lo), Math.sin(la)];
+}
+function toLatLon(v) {
+  return [Math.asin(v[2]) * 180 / Math.PI, Math.atan2(v[1], v[0]) * 180 / Math.PI];
+}
+
+function greatCirclePath(a, b, n) {
+  const v1 = toVec(a[4], a[5]), v2 = toVec(b[4], b[5]);
+  const dot = Math.min(1, Math.max(-1, v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2]));
+  const omega = Math.acos(dot) || 1e-6;
+  const pts = [];
+  let prevLon = null;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const s1 = Math.sin((1 - t) * omega) / Math.sin(omega);
+    const s2 = Math.sin(t * omega) / Math.sin(omega);
+    let [lat, lon] = toLatLon([
+      s1 * v1[0] + s2 * v2[0],
+      s1 * v1[1] + s2 * v2[1],
+      s1 * v1[2] + s2 * v2[2],
+    ]);
+    if (prevLon !== null) { // unwrap across the antimeridian
+      while (lon - prevLon > 180) lon -= 360;
+      while (lon - prevLon < -180) lon += 360;
+    }
+    prevLon = lon;
+    pts.push([lat, lon]);
+  }
+  return pts;
+}
+
+function setupFlightMap() {
+  const canvas = $("fl-map");
+  flMap.path = greatCirclePath(state.origin, state.dest.airport, 72);
+
+  let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+  for (const [lat, lon] of flMap.path) {
+    minLat = Math.min(minLat, lat); maxLat = Math.max(maxLat, lat);
+    minLon = Math.min(minLon, lon); maxLon = Math.max(maxLon, lon);
+  }
+  // Padding plus minimum spans so short hops still show context
+  let latSpan = Math.max(maxLat - minLat, 6), lonSpan = Math.max(maxLon - minLon, 8);
+  minLat -= latSpan * 0.35; maxLat += latSpan * 0.35;
+  minLon -= lonSpan * 0.3; maxLon += lonSpan * 0.3;
+  latSpan = maxLat - minLat; lonSpan = maxLon - minLon;
+
+  // Expand one axis so map proportions match the canvas
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const aspect = rect.width / rect.height;
+  const midLat = (minLat + maxLat) / 2;
+  const kx = Math.max(0.2, Math.cos(midLat * Math.PI / 180));
+  const visAspect = (lonSpan * kx) / latSpan;
+  if (visAspect < aspect) {
+    const need = (latSpan * aspect) / kx;
+    const grow = (need - lonSpan) / 2;
+    minLon -= grow; maxLon += grow;
+  } else {
+    const need = (lonSpan * kx) / aspect;
+    const grow = (need - latSpan) / 2;
+    minLat -= grow; maxLat += grow;
+  }
+  flMap.bounds = { minLat, maxLat, minLon, maxLon };
+
+  flMap.dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(rect.width * flMap.dpr);
+  canvas.height = Math.round(rect.height * flMap.dpr);
+}
+
+function projPoint(lat, lon, w, h) {
+  const b = flMap.bounds;
+  return [
+    ((lon - b.minLon) / (b.maxLon - b.minLon)) * w,
+    ((b.maxLat - lat) / (b.maxLat - b.minLat)) * h,
+  ];
+}
+
+function drawFlightMap(progress) {
+  const canvas = $("fl-map");
+  if (!flMap.bounds || !canvas.width) return;
+  const ctx2d = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height;
+  const b = flMap.bounds;
+  const px = (n) => n * flMap.dpr;
+  ctx2d.clearRect(0, 0, w, h);
+
+  // Graticule
+  ctx2d.strokeStyle = "rgba(140, 200, 255, 0.09)";
+  ctx2d.lineWidth = px(1);
+  const lonStep = (b.maxLon - b.minLon) > 60 ? 20 : (b.maxLon - b.minLon) > 20 ? 10 : 5;
+  const latStep = (b.maxLat - b.minLat) > 40 ? 20 : (b.maxLat - b.minLat) > 15 ? 10 : 5;
+  for (let lon = Math.ceil(b.minLon / lonStep) * lonStep; lon <= b.maxLon; lon += lonStep) {
+    const [x] = projPoint(0, lon, w, h);
+    ctx2d.beginPath(); ctx2d.moveTo(x, 0); ctx2d.lineTo(x, h); ctx2d.stroke();
+  }
+  for (let lat = Math.ceil(b.minLat / latStep) * latStep; lat <= b.maxLat; lat += latStep) {
+    const [, y] = projPoint(lat, 0, w, h);
+    ctx2d.beginPath(); ctx2d.moveTo(0, y); ctx2d.lineTo(w, y); ctx2d.stroke();
+  }
+
+  // The world as its airports — city-lights style
+  ctx2d.fillStyle = "rgba(160, 205, 255, 0.34)";
+  for (const a of AIRPORTS) {
+    for (const lonOff of [-360, 0, 360]) {
+      const lon = a[5] + lonOff;
+      if (lon < b.minLon || lon > b.maxLon || a[4] < b.minLat || a[4] > b.maxLat) continue;
+      const [x, y] = projPoint(a[4], lon, w, h);
+      ctx2d.beginPath(); ctx2d.arc(x, y, px(1.4), 0, Math.PI * 2); ctx2d.fill();
+    }
+  }
+
+  const pts = flMap.path.map(([lat, lon]) => projPoint(lat, lon, w, h));
+
+  // Route: remaining as dashes, flown as solid glow
+  ctx2d.strokeStyle = "rgba(160, 205, 255, 0.35)";
+  ctx2d.setLineDash([px(4), px(6)]);
+  ctx2d.lineWidth = px(1.4);
+  ctx2d.beginPath();
+  pts.forEach(([x, y], i) => i ? ctx2d.lineTo(x, y) : ctx2d.moveTo(x, y));
+  ctx2d.stroke();
+  ctx2d.setLineDash([]);
+
+  const posIdx = progress * (pts.length - 1);
+  const iFull = Math.floor(posIdx);
+  ctx2d.strokeStyle = "rgba(180, 220, 255, 0.95)";
+  ctx2d.shadowColor = "rgba(140, 200, 255, 0.9)";
+  ctx2d.shadowBlur = px(6);
+  ctx2d.lineWidth = px(2);
+  ctx2d.beginPath();
+  for (let i = 0; i <= iFull; i++) {
+    const [x, y] = pts[i];
+    i ? ctx2d.lineTo(x, y) : ctx2d.moveTo(x, y);
+  }
+  // interpolate partial segment
+  const frac = posIdx - iFull;
+  let plane = pts[iFull];
+  if (iFull < pts.length - 1) {
+    const [x1, y1] = pts[iFull], [x2, y2] = pts[iFull + 1];
+    plane = [x1 + (x2 - x1) * frac, y1 + (y2 - y1) * frac];
+    ctx2d.lineTo(plane[0], plane[1]);
+  }
+  ctx2d.stroke();
+  ctx2d.shadowBlur = 0;
+
+  // Endpoints
+  const drawEndpoint = (pt, code, align) => {
+    ctx2d.beginPath();
+    ctx2d.arc(pt[0], pt[1], px(3), 0, Math.PI * 2);
+    ctx2d.strokeStyle = "rgba(207, 233, 255, 0.9)";
+    ctx2d.lineWidth = px(1.4);
+    ctx2d.stroke();
+    ctx2d.fillStyle = "rgba(207, 233, 255, 0.85)";
+    ctx2d.font = `600 ${px(11)}px ui-monospace, SF Mono, Menlo, monospace`;
+    ctx2d.textAlign = align;
+    ctx2d.fillText(code, pt[0] + (align === "left" ? px(8) : -px(8)), pt[1] - px(7));
+  };
+  drawEndpoint(pts[0], state.origin[0], "left");
+  drawEndpoint(pts[pts.length - 1], state.dest.airport[0], "right");
+
+  // The aircraft
+  const ahead = pts[Math.min(iFull + 1, pts.length - 1)];
+  const angle = Math.atan2(ahead[1] - plane[1], ahead[0] - plane[0]);
+  ctx2d.save();
+  ctx2d.translate(plane[0], plane[1]);
+  ctx2d.rotate(angle + Math.PI / 2);
+  ctx2d.shadowColor = "rgba(180, 220, 255, 1)";
+  ctx2d.shadowBlur = px(10);
+  ctx2d.fillStyle = "#EAF4FF";
+  const s = px(9);
+  ctx2d.beginPath();                       // simple jet silhouette
+  ctx2d.moveTo(0, -s);                     // nose
+  ctx2d.lineTo(s * 0.28, -s * 0.2);
+  ctx2d.lineTo(s, s * 0.35);               // right wing
+  ctx2d.lineTo(s * 0.22, s * 0.25);
+  ctx2d.lineTo(s * 0.4, s * 0.9);          // right tail
+  ctx2d.lineTo(0, s * 0.72);
+  ctx2d.lineTo(-s * 0.4, s * 0.9);         // left tail
+  ctx2d.lineTo(-s * 0.22, s * 0.25);
+  ctx2d.lineTo(-s, s * 0.35);              // left wing
+  ctx2d.lineTo(-s * 0.28, -s * 0.2);
+  ctx2d.closePath();
+  ctx2d.fill();
+  ctx2d.restore();
+}
+
+/* ---------- Phase change flash ---------- */
+
+let lastFlashPhase = "";
+let flashTimer = null;
+function flashPhase(text) {
+  if (text === lastFlashPhase) return;
+  lastFlashPhase = text;
+  const el = $("phase-flash");
+  clearTimeout(flashTimer);
+  el.hidden = false;
+  el.textContent = text;
+  el.classList.remove("show");
+  void el.offsetWidth; // restart animation
+  el.classList.add("show");
+  flashTimer = setTimeout(() => { el.hidden = true; }, 2700);
 }
 
 function tickFlight() {
@@ -689,8 +900,23 @@ function tickFlight() {
     p < 0.97 ? "DESCENT" : "FINAL APPROACH";
   $("fl-phase").textContent = phase;
 
+  drawFlightMap(p);
+
+  if (!state.paused) {
+    if (p >= 0.97) flashPhase("FINAL APPROACH");
+    else if (p >= 0.85) flashPhase("COMMENCING DESCENT");
+    else if (p >= 0.1) flashPhase("CRUISING ALTITUDE");
+  }
+
   if (!state.paused && state.remaining <= 0) land(true);
 }
+
+window.addEventListener("resize", () => {
+  if (state.flying && flMap.bounds) {
+    setupFlightMap();
+    drawFlightMap(progressNow());
+  }
+});
 
 $("btn-hold").addEventListener("click", () => {
   state.paused = !state.paused;
