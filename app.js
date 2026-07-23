@@ -10,6 +10,12 @@ const MUSIC_TRACKS = typeof MUSIC_DATA !== "undefined" ? MUSIC_DATA : [
   "music/bepatient1.mp3",
 ];
 
+/* Night-flight playlist — plays on repeat in any class on night flights */
+const NIGHT_TRACKS = typeof NIGHT_DATA !== "undefined" ? NIGHT_DATA : [
+  "music/reverb.mp3",
+  "music/reverb1.mp3",
+];
+
 const AIRLINES = [
   {
     id: "hopper", name: "Hopper Air", tier: "Budget", tag: "No frills. All focus.",
@@ -71,6 +77,7 @@ const state = {
   duration: 25,        // wheel minutes
   dest: null,          // { airport, mins, km }
   fare: null,          // { airline, cls: "Y"|"J", price }
+  night: false,        // night flight: no briefing, night playlist
   flightNo: "",
   task: "",
   totalSeconds: 0,
@@ -122,6 +129,7 @@ function scheduleFlight(ts) {
     airlineId: state.fare.airline.id,
     cls: state.fare.cls,
     price: state.fare.price,
+    night: state.night,
     task: state.task,
     flightNo: state.flightNo,
   });
@@ -179,6 +187,7 @@ function kickScheduled(entry) {
   state.origin = origin;
   state.dest = { airport: dest, mins: entry.mins, km: entry.km };
   state.fare = { airline, cls: entry.cls, price: entry.price };
+  state.night = !!entry.night;
   state.task = entry.task || "";
   state.flightNo = entry.flightNo;
   playChime();
@@ -299,12 +308,25 @@ function setOrigin(a) {
   originResults.hidden = true;
   storeSet("ff-origin", a[0]);
   const firstReveal = $("time-field").hidden;
+  $("depart-field").hidden = false;
   $("time-field").hidden = false;
   $("dest-field").hidden = false;
   $("range-origin").textContent = a[0];
   if (firstReveal) requestAnimationFrame(() => setWheel(state.duration, false));
   renderDestinations();
 }
+
+/* ---------- Day / night departure ---------- */
+
+function setNight(night) {
+  state.night = night;
+  $("seg-day").classList.toggle("on", !night);
+  $("seg-night").classList.toggle("on", night);
+  $("night-hint").hidden = !night;
+  storeSet("ff-night", night ? "1" : "0");
+}
+$("seg-day").addEventListener("click", () => setNight(false));
+$("seg-night").addEventListener("click", () => setNight(true));
 
 /* ---------- Time wheel ---------- */
 
@@ -471,8 +493,8 @@ function fillTicket() {
   $("t-from-city").textContent = o[2];
   $("t-to-code").textContent = d.airport[0];
   $("t-to-city").textContent = d.airport[2];
-  $("t-dep").textContent = hhmm(dep);
-  $("t-arr").textContent = hhmm(arr);
+  $("t-dep").textContent = state.night ? "AT NIGHT ☾" : hhmm(dep);
+  $("t-arr").textContent = state.night ? "+" + fmtMins(d.mins) : hhmm(arr);
   $("t-dur").textContent = fmtMins(d.mins);
   $("t-dist").textContent = d.km.toLocaleString() + " km";
   $("t-gate").textContent = "ABCD"[Math.floor(Math.random() * 4)] + (1 + Math.floor(Math.random() * 24));
@@ -542,7 +564,9 @@ function startFlight() {
   $("fl-from").textContent = state.origin[0];
   $("fl-to").textContent = d.airport[0];
   $("fl-task").textContent = state.task || "";
-  $("fl-fare").textContent = `${state.fare.airline.name} · ${CLASS_NAMES[state.fare.cls]}`;
+  $("fl-fare").textContent = `${state.fare.airline.name} · ${CLASS_NAMES[state.fare.cls]}` +
+    (state.night ? " · Night flight" : "");
+  $("screen-flight").classList.toggle("night", state.night);
   $("fl-timer").textContent = fmtClock(state.totalSeconds);
   $("fl-phase").textContent = "PRE-FLIGHT";
   $("fl-progress").style.width = "0%";
@@ -556,6 +580,9 @@ function startFlight() {
   show("screen-flight");
   setupFlightMap();
   drawFlightMap(0);
+  $("btn-map").textContent = mapMode === "live" ? "Map · live" : "Map · radar";
+  $("fl-map").parentElement.style.visibility = mapMode === "live" ? "hidden" : "";
+  if (mapMode === "live") buildGmap(); else teardownGmap();
   // Start audio inside the boarding gesture so autoplay is permitted;
   // the pre-flight sequence plays over it.
   if (state.audioOn) startAudio();
@@ -631,12 +658,29 @@ function runPreflight(done) {
   $("screen-flight").classList.add("boarding");
   belt.setAttribute("hidden", "");
   label.textContent = "CABIN DOORS CLOSING";
-  sub.textContent = "Cabin crew, arm doors and cross-check";
+  sub.textContent = state.night ? "Cabin lights dimmed for your night flight" : "Cabin crew, arm doors and cross-check";
   pf.hidden = false;
   $("pf-skip").onclick = finish;
 
   preflightTimers.forEach(clearTimeout);
   preflightTimers = [setTimeout(() => pf.classList.add("closed"), 60)];
+
+  // Night flights skip the briefing and captain — doors, hush, takeoff
+  if (state.night) {
+    preflightTimers.push(
+      setTimeout(guard(() => {
+        label.textContent = "NIGHT FLIGHT";
+        sub.textContent = "No announcements tonight — rest your mind";
+      }), 2400),
+      setTimeout(guard(() => {
+        label.textContent = "CLEARED FOR TAKEOFF";
+        sub.textContent = "V1 — rotate";
+        playSpool();
+      }), 4600),
+      setTimeout(finish, 6600),
+    );
+    return;
+  }
 
   const takeoff = guard(() => {
     belt.setAttribute("hidden", "");
@@ -941,6 +985,92 @@ function drawFlightMap(progress) {
   ctx2d.restore();
 }
 
+/* ---------- Full-screen live map (Google Maps embed) ----------
+   Keyless embed centered on the aircraft, refreshed as it flies; our
+   glowing marker rides at centre. Where embeds are blocked (hosted
+   artifact CSP) it detects the failure and stays on the radar map. */
+
+let mapMode = storeGet("ff-mapmode", "radar"); // "radar" | "live"
+const gmap = { frame: null, plane: null, lastT: 0, loaded: false };
+
+function currentLatLon(p) {
+  const path = flMap.path;
+  if (!path || !path.length) return null;
+  const f = p * (path.length - 1);
+  const i = Math.floor(f), t = f - i;
+  const a = path[i], b = path[Math.min(i + 1, path.length - 1)];
+  return { lat: a[0] + (b[0] - a[0]) * t, lon: a[1] + (b[1] - a[1]) * t, a, b };
+}
+
+function gmapZoom(p) {
+  if (p < 0.12 || p > 0.85) return 9; // takeoff / approach: close in
+  const km = state.dest ? state.dest.km : 500;
+  return km > 3000 ? 5 : km > 1200 ? 6 : 7;
+}
+
+function buildGmap() {
+  const wrap = $("fl-gmap");
+  wrap.innerHTML = "";
+  wrap.hidden = false;
+  const f = document.createElement("iframe");
+  f.setAttribute("aria-hidden", "true");
+  gmap.loaded = false;
+  f.addEventListener("load", () => { gmap.loaded = true; });
+  wrap.appendChild(f);
+  const plane = document.createElement("div");
+  plane.className = "gmap-plane";
+  plane.textContent = "▲";
+  wrap.appendChild(plane);
+  gmap.frame = f;
+  gmap.plane = plane;
+  gmap.lastT = 0;
+  updateGmap(progressNow(), true);
+  // If the embed can't load here, fall back to the radar map
+  setTimeout(() => {
+    if (mapMode === "live" && !gmap.loaded) {
+      setMapMode("radar");
+      const btn = $("btn-map");
+      btn.textContent = "Live map unavailable";
+      setTimeout(() => { btn.textContent = "Map · radar"; }, 2600);
+    }
+  }, 4500);
+}
+
+function teardownGmap() {
+  const wrap = $("fl-gmap");
+  wrap.innerHTML = "";
+  wrap.hidden = true;
+  gmap.frame = null;
+  gmap.plane = null;
+}
+
+function updateGmap(p, force) {
+  if (!gmap.frame) return;
+  const pos = currentLatLon(p);
+  if (!pos) return;
+  // Heading marker updates every tick; the map itself only every 8s
+  const dx = (pos.b[1] - pos.a[1]) * Math.cos(pos.lat * Math.PI / 180);
+  const dy = -(pos.b[0] - pos.a[0]);
+  const deg = Math.atan2(dx, -dy) * 180 / Math.PI;
+  gmap.plane.style.transform = `translate(-50%, -50%) rotate(${deg}deg)`;
+  const now = Date.now();
+  if (!force && now - gmap.lastT < 8000) return;
+  gmap.lastT = now;
+  const lon = ((pos.lon + 540) % 360) - 180;
+  gmap.frame.src = `https://maps.google.com/maps?ll=${pos.lat.toFixed(4)},${lon.toFixed(4)}&z=${gmapZoom(p)}&t=k&output=embed`;
+}
+
+function setMapMode(mode) {
+  mapMode = mode;
+  storeSet("ff-mapmode", mode);
+  $("btn-map").textContent = mode === "live" ? "Map · live" : "Map · radar";
+  $("fl-map").parentElement.style.visibility = mode === "live" ? "hidden" : "";
+  if (mode === "live" && state.flying) buildGmap();
+  else teardownGmap();
+}
+
+$("btn-map").addEventListener("click", () => setMapMode(mapMode === "live" ? "radar" : "live"));
+
 /* ---------- Phase change flash ---------- */
 
 let lastFlashPhase = "";
@@ -989,6 +1119,7 @@ function tickFlight() {
   $("fl-phase").textContent = phase;
 
   drawFlightMap(p);
+  if (mapMode === "live") updateGmap(p);
 
   if (!state.paused) {
     if (p >= 0.97) flashPhase("FINAL APPROACH");
@@ -1045,6 +1176,7 @@ function land(completed) {
   clearInterval(state.timerId);
   state.timerId = null;
   state.flying = false;
+  teardownGmap();
   stopAudio();
   document.title = "FocusFlight";
 
@@ -1159,7 +1291,7 @@ function ctx() {
 }
 
 function startAudio() {
-  if (state.fare && state.fare.cls === "J") startMusic();
+  if (state.night || (state.fare && state.fare.cls === "J")) startMusic();
   else startHum();
 }
 
@@ -1187,12 +1319,13 @@ function startMusic() {
     return;
   }
   const session = ++audioSession;
+  const tracks = state.night ? NIGHT_TRACKS : MUSIC_TRACKS;
   let idx = 0;
-  const el = new Audio(MUSIC_TRACKS[0]);
+  const el = new Audio(tracks[0]);
   el.volume = 0.9;
   el.addEventListener("ended", () => {
-    idx = (idx + 1) % MUSIC_TRACKS.length; // loop the playlist forever
-    el.src = MUSIC_TRACKS[idx];
+    idx = (idx + 1) % tracks.length; // loop the playlist forever
+    el.src = tracks[idx];
     el.play().catch(() => {});
   });
   el.addEventListener("error", () => {
@@ -1405,6 +1538,7 @@ $("btn-audio").addEventListener("click", () => {
     const a = AIRPORTS.find((x) => x[0] === savedOrigin);
     if (a) setOrigin(a);
   }
+  setNight(storeGet("ff-night", "0") === "1");
   requestAnimationFrame(() => setWheel(25, false));
   checkSchedules();
   setInterval(checkSchedules, 5000);

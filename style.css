@@ -121,6 +121,18 @@ main.screen.active {
 
 .range-hint { font-style: normal; color: var(--accent); letter-spacing: 0.06em; }
 
+/* Day / night departure toggle */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
+.seg-btn {
+  background: none; border: none; font-family: var(--sans); font-size: 0.88rem;
+  color: var(--muted); padding: 0.55rem 1.1rem; cursor: pointer;
+  border-right: 1px solid var(--line);
+}
+.seg-btn:last-child { border-right: none; }
+.seg-btn.on { background: var(--ink); color: var(--bg); }
+#night-hint { display: block; margin-top: 0.5rem; }
+#night-hint[hidden] { display: none; }
+
 /* Time wheel */
 .wheel-frame { position: relative; }
 .wheel {
@@ -378,6 +390,26 @@ main.screen.active {
   animation: twinkle 6s ease-in-out infinite alternate;
 }
 @keyframes twinkle { from { opacity: 0.45; } to { opacity: 0.8; } }
+
+/* Night flight: deeper sky, brighter stars, moonlit cast */
+.flight.night { background: radial-gradient(120% 90% at 50% 110%, #0D1022 0%, #05060C 60%); }
+.flight.night .fl-stars { opacity: 1; animation-duration: 4s; }
+.flight.night .fl-timer { color: #E6ECFF; text-shadow: 0 0 34px rgba(150, 170, 255, 0.4), 0 0 90px rgba(150, 170, 255, 0.18); }
+.flight.night .fl-phase { color: rgba(200, 210, 255, 0.6); }
+
+/* Full-screen live map layer (Google Maps embed, dark-filtered) */
+.fl-gmap { position: absolute; inset: 0; z-index: 1; }
+.fl-gmap[hidden] { display: none; }
+.fl-gmap iframe {
+  width: 100%; height: 100%; border: 0; pointer-events: none;
+  filter: brightness(0.72) saturate(0.85);
+}
+.gmap-plane {
+  position: absolute; left: 50%; top: 50%;
+  font-size: 2.2rem; color: #EAF4FF;
+  text-shadow: 0 0 16px rgba(140, 200, 255, 0.95);
+  pointer-events: none;
+}
 
 .fl-route {
   position: relative; z-index: 2;
