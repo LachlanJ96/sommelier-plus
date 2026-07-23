@@ -825,15 +825,18 @@ function startBusinessAudio() {
   // Hidden audio-only player. Created synchronously so a user-gesture call
   // (boarding click) grants it autoplay permission. enablejsapi lets the
   // embed report its real player state back over postMessage.
+  const wrap = document.createElement("div");
+  wrap.className = "yt-dock";
+  wrap.innerHTML = `<span class="yt-dock-label mono">TAP PLAY FOR CABIN MUSIC</span>`;
   const f = document.createElement("iframe");
   f.src = `https://www.youtube.com/embed/${BUSINESS_YT_ID}` +
-    `?autoplay=1&loop=1&playlist=${BUSINESS_YT_ID}&controls=0&playsinline=1&enablejsapi=1`;
+    `?autoplay=1&loop=1&playlist=${BUSINESS_YT_ID}&playsinline=1&enablejsapi=1`;
   f.allow = "autoplay";
-  f.setAttribute("aria-hidden", "true");
-  f.tabIndex = -1;
-  f.style.cssText = "position:fixed;left:-9999px;top:0;width:220px;height:220px;border:0;";
+  wrap.appendChild(f);
+  document.body.appendChild(wrap);
 
   let playing = false;
+  let loadFired = false;
   const send = (obj) => {
     try { f.contentWindow.postMessage(JSON.stringify(obj), "*"); } catch (e) { /* frame gone */ }
   };
@@ -845,28 +848,36 @@ function startBusinessAudio() {
     if (d.event === "onReady") send({ event: "command", func: "playVideo", args: [] });
     // playerState 1 = playing, 3 = buffering
     const s = d.info && typeof d.info === "object" ? d.info.playerState : undefined;
-    if (s === 1 || s === 3) playing = true;
+    if (s === 1 || s === 3) {
+      playing = true;
+      wrap.classList.remove("visible"); // music confirmed — tuck away
+    }
   };
   window.addEventListener("message", ytMsgHandler);
 
   f.addEventListener("load", () => {
+    loadFired = true;
     send({ event: "listening", id: "ff-biz", channel: "widget" });
     // Nudge playback in case autoplay was swallowed
     setTimeout(() => send({ event: "command", func: "playVideo", args: [] }), 700);
     setTimeout(() => send({ event: "command", func: "playVideo", args: [] }), 2000);
   });
 
-  document.body.appendChild(f);
-  ytFrame = f;
+  ytFrame = wrap;
 
-  // Only trust actual playback. If the embed hasn't reported a playing/
-  // buffering state in time (blocked network, CSP, adblock, autoplay
-  // refusal), switch to the synthesized lounge pad so business class is
-  // never silent.
+  // Decide after 5s based on what actually happened:
+  //  - playing: stay hidden, music is on.
+  //  - loaded but not playing (autoplay refused, common on phones):
+  //    surface a small player so one tap starts the song.
+  //  - never loaded (blocked network/CSP/adblock): synthesized lounge pad.
   setTimeout(() => {
     if (session !== audioSession || playing) return;
-    removeYtFrame();
-    startPad();
+    if (loadFired) {
+      wrap.classList.add("visible");
+    } else {
+      removeYtFrame();
+      startPad();
+    }
   }, 5000);
 }
 
