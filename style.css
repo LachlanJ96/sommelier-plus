@@ -413,11 +413,11 @@ main.screen.active {
   pointer-events: none; text-align: center; padding: 0 1rem;
 }
 .phase-flash[hidden] { display: none; }
-.phase-flash.show { animation: phase-flash 2.6s ease-out forwards; }
+.phase-flash.show { animation: phase-flash 8s ease-out forwards; }
 @keyframes phase-flash {
   0% { opacity: 0; transform: scale(0.92); filter: blur(6px); }
-  12% { opacity: 1; transform: scale(1); filter: blur(0); }
-  70% { opacity: 1; }
+  5% { opacity: 1; transform: scale(1); filter: blur(0); }
+  88% { opacity: 1; transform: scale(1.02); }
   100% { opacity: 0; transform: scale(1.05); filter: blur(3px); }
 }
 .fl-phase {

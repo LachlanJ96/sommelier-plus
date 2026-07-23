@@ -563,7 +563,7 @@ function startFlight() {
     $("btn-audio").textContent = "Tap to start audio";
     document.addEventListener("click", () => {
       if (state.flying && state.audioOn) {
-        stopAudio();
+        pauseAudio();
         startAudio();
         $("btn-audio").textContent = "Cabin audio · on";
       }
@@ -876,7 +876,7 @@ function flashPhase(text) {
   el.classList.remove("show");
   void el.offsetWidth; // restart animation
   el.classList.add("show");
-  flashTimer = setTimeout(() => { el.hidden = true; }, 2700);
+  flashTimer = setTimeout(() => { el.hidden = true; }, 8100);
 }
 
 function tickFlight() {
@@ -930,7 +930,7 @@ window.addEventListener("resize", () => {
 $("btn-hold").addEventListener("click", () => {
   state.paused = !state.paused;
   if (state.paused) {
-    stopAudio();
+    pauseAudio();
   } else {
     state.endAt = Date.now() + state.remaining * 1000;
     if (state.audioOn) startAudio();
@@ -1084,6 +1084,15 @@ function startAudio() {
   else startHum();
 }
 
+/* Pause keeps the soundtrack's position (audio toggle, holding pattern);
+   only landing fully stops it so the next flight starts fresh. */
+function pauseAudio() {
+  audioSession++;
+  stopHum();
+  if (musicEl) { try { musicEl.pause(); } catch (e) { /* gone */ } }
+  stopPad();
+}
+
 function stopAudio() {
   audioSession++;
   stopHum();
@@ -1092,7 +1101,12 @@ function stopAudio() {
 }
 
 function startMusic() {
-  if (musicEl || padNodes) return;
+  if (padNodes) return;
+  if (musicEl) { // resume where it left off
+    const p = musicEl.play();
+    if (p && p.catch) p.catch(() => {});
+    return;
+  }
   const session = ++audioSession;
   let idx = 0;
   const el = new Audio(MUSIC_TRACKS[0]);
@@ -1301,7 +1315,7 @@ $("btn-audio").addEventListener("click", () => {
   state.audioOn = !state.audioOn;
   $("btn-audio").textContent = state.audioOn ? "Cabin audio · on" : "Cabin audio · off";
   $("btn-audio").classList.toggle("off", !state.audioOn);
-  if (state.audioOn && !state.paused) startAudio(); else stopAudio();
+  if (state.audioOn && !state.paused) startAudio(); else pauseAudio();
 });
 
 /* ---------- Init ---------- */
