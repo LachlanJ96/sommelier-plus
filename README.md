@@ -11,9 +11,8 @@ A minimalist, flight-themed deep-focus timer inspired by [focusflight.net](https
 2. **Fare** — choose between three carriers — Hopper Air (budget, economy only),
    Meridian Airways (mid-range) and Aurum Air (premium) — in Economy or
    Business. Availability is seeded per route and day: some carriers don't fly
-   the route, some classes sell out. Business class plays in-flight music
-   (YouTube audio, with a synthesized lounge-pad fallback where embeds are
-   blocked).
+   the route, some classes sell out. Business class plays the in-flight
+   soundtrack — a looping playlist of local MP3s in music/.
 3. **Ticket** — a boarding pass is issued with flight number, gate, seat,
    departure/arrival times, and your mission written on it.
 4. **Tear & board** — the ticket physically tears along the perforation

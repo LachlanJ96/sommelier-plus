@@ -452,24 +452,6 @@ main.screen.active {
 .btn-fl.off { opacity: 0.45; }
 .btn-fl-danger:hover, .btn-fl-danger.armed { border-color: #E8604F; color: #E8604F; }
 
-/* Business-class music dock: off-screen while audio plays hidden;
-   surfaces small when autoplay needs a tap */
-.yt-dock {
-  position: fixed; left: -9999px; top: 0; z-index: 28;
-  width: 232px; display: flex; flex-direction: column; gap: 0.35rem;
-}
-.yt-dock iframe { width: 232px; height: 131px; border: 0; border-radius: 3px; }
-.yt-dock-label {
-  display: none; font-size: 0.58rem; letter-spacing: 0.22em;
-  color: rgba(242,242,239,0.75); text-align: center;
-}
-.yt-dock.visible {
-  left: auto; right: 1rem; bottom: 6.2rem; top: auto;
-  box-shadow: 0 14px 36px rgba(0,0,0,0.5);
-  animation: news-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
-}
-.yt-dock.visible .yt-dock-label { display: block; animation: pulse 1.4s ease-in-out infinite; }
-
 /* Pre-flight sequence */
 .preflight {
   position: absolute; inset: 0; z-index: 25;

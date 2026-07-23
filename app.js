@@ -2,7 +2,13 @@
 
 const CRUISE_KMH = 900;
 const DURATIONS = [10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 105, 120, 150, 180, 240];
-const BUSINESS_YT_ID = "NHOFkcun06s"; // the app's in-flight music soundtrack
+/* The app's in-flight music soundtrack (business class), played as a
+   looping playlist. MUSIC_DATA (data URIs) is injected by the single-file
+   bundle build; otherwise the MP3s are loaded from music/. */
+const MUSIC_TRACKS = typeof MUSIC_DATA !== "undefined" ? MUSIC_DATA : [
+  "music/bepatient.mp3",
+  "music/bepatient1.mp3",
+];
 
 const AIRLINES = [
   {
@@ -583,10 +589,12 @@ function playAnnouncement(name, fallbackMs, cb) {
     if (advanced) return;
     advanced = true;
     currentAnn = null;
+    duckMusic(false);
     cb();
   };
   let a;
   try { a = new Audio(ANNOUNCEMENTS[name]); } catch (e) { setTimeout(next, fallbackMs); return; }
+  duckMusic(true);
   currentAnn = a;
   a.addEventListener("ended", () => setTimeout(next, 500));
   a.addEventListener("error", () => setTimeout(next, fallbackMs));
@@ -598,6 +606,7 @@ function stopAnnouncement() {
     try { currentAnn.pause(); } catch (e) { /* already gone */ }
     currentAnn = null;
   }
+  duckMusic(false);
 }
 
 let preflightTimers = [];
@@ -1055,13 +1064,12 @@ $("btn-log-back").addEventListener("click", () => show("screen-book"));
 
 /* ---------- Cabin audio ----------
    Economy: synthesized cabin hum (WebAudio, no assets).
-   Business: in-flight music via hidden YouTube embed (audio only);
-   where external embeds are blocked (e.g. hosted artifact CSP),
-   falls back to a synthesized first-class lounge pad. */
+   Business: the app's music soundtrack as a looping playlist of local
+   MP3s; if a track can't load, falls back to the synthesized lounge pad. */
 
 let audioCtx = null;
 let audioNodes = null;   // economy hum
-let ytFrame = null;      // business: youtube iframe
+let musicEl = null;      // business: soundtrack player
 let padNodes = null;     // business: fallback lounge pad
 let audioSession = 0;    // guards async fallback races
 
@@ -1072,89 +1080,49 @@ function ctx() {
 }
 
 function startAudio() {
-  if (state.fare && state.fare.cls === "J") startBusinessAudio();
+  if (state.fare && state.fare.cls === "J") startMusic();
   else startHum();
 }
 
 function stopAudio() {
   audioSession++;
   stopHum();
-  removeYtFrame();
+  stopMusic();
   stopPad();
 }
 
-let ytMsgHandler = null;
-
-function startBusinessAudio() {
-  if (ytFrame || padNodes) return;
+function startMusic() {
+  if (musicEl || padNodes) return;
   const session = ++audioSession;
-  // Hidden audio-only player. Created synchronously so a user-gesture call
-  // (boarding click) grants it autoplay permission. enablejsapi lets the
-  // embed report its real player state back over postMessage.
-  const wrap = document.createElement("div");
-  wrap.className = "yt-dock";
-  wrap.innerHTML = `<span class="yt-dock-label mono">TAP PLAY FOR CABIN MUSIC</span>`;
-  const f = document.createElement("iframe");
-  f.src = `https://www.youtube.com/embed/${BUSINESS_YT_ID}` +
-    `?autoplay=1&loop=1&playlist=${BUSINESS_YT_ID}&playsinline=1&enablejsapi=1`;
-  f.allow = "autoplay";
-  wrap.appendChild(f);
-  document.body.appendChild(wrap);
-
-  let playing = false;
-  let loadFired = false;
-  const send = (obj) => {
-    try { f.contentWindow.postMessage(JSON.stringify(obj), "*"); } catch (e) { /* frame gone */ }
-  };
-  ytMsgHandler = (e) => {
-    if (!/^https:\/\/www\.youtube(-nocookie)?\.com$/.test(e.origin)) return;
-    let d = e.data;
-    if (typeof d === "string") { try { d = JSON.parse(d); } catch (err) { return; } }
-    if (!d) return;
-    if (d.event === "onReady") send({ event: "command", func: "playVideo", args: [] });
-    // playerState: 1 playing, 3 buffering, 0 ended
-    const s = d.info && typeof d.info === "object" ? d.info.playerState : undefined;
-    if (s === 1 || s === 3) {
-      playing = true;
-      wrap.classList.remove("visible"); // music confirmed — tuck away
-    }
-    if (s === 0) {
-      // The loop=1 param is unreliable in embeds — restart the track ourselves
-      send({ event: "command", func: "seekTo", args: [0, true] });
-      send({ event: "command", func: "playVideo", args: [] });
-    }
-  };
-  window.addEventListener("message", ytMsgHandler);
-
-  f.addEventListener("load", () => {
-    loadFired = true;
-    send({ event: "listening", id: "ff-biz", channel: "widget" });
-    // Nudge playback in case autoplay was swallowed
-    setTimeout(() => send({ event: "command", func: "playVideo", args: [] }), 700);
-    setTimeout(() => send({ event: "command", func: "playVideo", args: [] }), 2000);
+  let idx = 0;
+  const el = new Audio(MUSIC_TRACKS[0]);
+  el.volume = 0.9;
+  el.addEventListener("ended", () => {
+    idx = (idx + 1) % MUSIC_TRACKS.length; // loop the playlist forever
+    el.src = MUSIC_TRACKS[idx];
+    el.play().catch(() => {});
   });
-
-  ytFrame = wrap;
-
-  // Decide after 5s based on what actually happened:
-  //  - playing: stay hidden, music is on.
-  //  - loaded but not playing (autoplay refused, common on phones):
-  //    surface a small player so one tap starts the song.
-  //  - never loaded (blocked network/CSP/adblock): synthesized lounge pad.
-  setTimeout(() => {
-    if (session !== audioSession || playing) return;
-    if (loadFired) {
-      wrap.classList.add("visible");
-    } else {
-      removeYtFrame();
-      startPad();
-    }
-  }, 5000);
+  el.addEventListener("error", () => {
+    if (session !== audioSession) return;
+    stopMusic();
+    startPad();
+  });
+  musicEl = el;
+  const p = el.play();
+  // Autoplay refusal (e.g. a scheduled departure with no prior tap) is
+  // recovered by the "Tap to start audio" nudge, which re-calls startAudio.
+  if (p && p.catch) p.catch(() => {});
 }
 
-function removeYtFrame() {
-  if (ytMsgHandler) { window.removeEventListener("message", ytMsgHandler); ytMsgHandler = null; }
-  if (ytFrame) { ytFrame.remove(); ytFrame = null; }
+function stopMusic() {
+  if (!musicEl) return;
+  try { musicEl.pause(); } catch (e) { /* already gone */ }
+  musicEl.removeAttribute("src");
+  musicEl = null;
+}
+
+function duckMusic(on) {
+  if (musicEl) musicEl.volume = on ? 0.25 : 0.9;
 }
 
 /* Fallback lounge pad: slow warm chords over a faint hum */
