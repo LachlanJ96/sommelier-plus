@@ -42,12 +42,24 @@
     </div>
   </main>
 
+  <!-- ============ FARE ============ -->
+  <main id="screen-fare" class="screen">
+    <div class="fare">
+      <span class="label">Select carrier &amp; class</span>
+      <h2 class="fare-title" id="fare-route-city">Sydney → Gold Coast</h2>
+      <p class="fare-route mono" id="fare-route">SYD → OOL · 45 min · 681 km</p>
+      <ul class="airline-list" id="airline-list"></ul>
+      <p class="fine">Availability varies by route and day.</p>
+      <button class="btn-text" id="btn-fare-back">← Change flight</button>
+    </div>
+  </main>
+
   <!-- ============ TICKET ============ -->
   <main id="screen-ticket" class="screen">
     <div class="ticket" id="ticket">
       <div class="ticket-main">
         <div class="ticket-head">
-          <span class="ticket-airline">FOCUSFLIGHT</span>
+          <span class="ticket-airline" id="t-airline">FOCUSFLIGHT</span>
           <span class="ticket-no mono" id="t-flight">FF 212</span>
         </div>
         <div class="ticket-route">
@@ -71,6 +83,8 @@
           <div><span class="g-label">Distance</span><span id="t-dist">—</span></div>
           <div><span class="g-label">Gate</span><span id="t-gate">—</span></div>
           <div><span class="g-label">Seat</span><span id="t-seat">—</span></div>
+          <div><span class="g-label">Class</span><span id="t-class">—</span></div>
+          <div><span class="g-label">Fare</span><span id="t-fare">—</span></div>
         </div>
         <div class="ticket-mission">
           <span class="g-label">Mission</span>
@@ -115,6 +129,7 @@
       <span class="fl-phase" id="fl-phase">BOARDING</span>
       <div class="fl-timer mono" id="fl-timer">00:00</div>
       <p class="fl-task" id="fl-task"></p>
+      <p class="fl-fare mono" id="fl-fare"></p>
     </div>
 
     <div class="fl-telemetry mono" id="fl-telemetry">

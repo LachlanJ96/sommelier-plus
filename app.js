@@ -2,6 +2,61 @@
 
 const CRUISE_KMH = 900;
 const DURATIONS = [10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 105, 120, 150, 180, 240];
+const BUSINESS_YT_ID = "L9iFUdkIkBE"; // in-flight music for business class
+
+const AIRLINES = [
+  {
+    id: "hopper", name: "Hopper Air", tier: "Budget", tag: "No frills. All focus.",
+    rate: 0.07, base: 19, hasBusiness: false, offRoute: 0.18, soldEco: 0.15,
+    logo: `<svg viewBox="0 0 38 38"><circle cx="19" cy="19" r="18" fill="#F27B13"/><path d="M8 25 L15 14 L20 21 L25 11 L30 25" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  },
+  {
+    id: "meridian", name: "Meridian Airways", tier: "Mid-range", tag: "The dependable daily.",
+    rate: 0.12, base: 49, hasBusiness: true, offRoute: 0.08, soldEco: 0.12, soldBiz: 0.25,
+    logo: `<svg viewBox="0 0 38 38"><circle cx="19" cy="19" r="17" fill="none" stroke="#1E63D0" stroke-width="2.4"/><ellipse cx="19" cy="19" rx="8" ry="17" fill="none" stroke="#1E63D0" stroke-width="1.6"/><line x1="2" y1="19" x2="36" y2="19" stroke="#1E63D0" stroke-width="2.4"/></svg>`,
+  },
+  {
+    id: "aurum", name: "Aurum Air", tier: "Premium", tag: "Quiet luxury at altitude.",
+    rate: 0.24, base: 120, hasBusiness: true, offRoute: 0.25, soldEco: 0.30, soldBiz: 0.15,
+    logo: `<svg viewBox="0 0 38 38"><circle cx="19" cy="19" r="18" fill="#14161C"/><path d="M19 7 L27 29 L23.5 29 L19 16.5 L14.5 29 L11 29 Z" fill="#C9A54E"/><line x1="13" y1="24" x2="25" y2="24" stroke="#C9A54E" stroke-width="1.6"/></svg>`,
+  },
+];
+
+/* Deterministic per-route, per-day availability */
+function seededRng(str) {
+  let h = 7;
+  for (let i = 0; i < str.length; i++) h = (Math.imul(h, 31) + str.charCodeAt(i)) | 0;
+  return function () {
+    h = (h + 0x6D2B79F5) | 0;
+    let t = Math.imul(h ^ (h >>> 15), 1 | h);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function fareBoard(originCode, destCode, km) {
+  const day = new Date().toDateString();
+  const rng = seededRng(`${originCode}-${destCode}-${day}`);
+  const board = AIRLINES.map((al) => {
+    const onRoute = rng() > al.offRoute;
+    const ecoPrice = Math.round(al.base + km * al.rate);
+    const bizPrice = Math.round(ecoPrice * 3.2);
+    return {
+      airline: al,
+      onRoute,
+      eco: { price: ecoPrice, sold: rng() < al.soldEco },
+      biz: al.hasBusiness ? { price: bizPrice, sold: rng() < al.soldBiz } : null,
+    };
+  });
+  // Guarantee at least one bookable fare
+  const bookable = board.some((b) => b.onRoute && ((b.eco && !b.eco.sold) || (b.biz && !b.biz.sold)));
+  if (!bookable) {
+    const mid = board[1];
+    mid.onRoute = true;
+    mid.eco.sold = false;
+  }
+  return board;
+}
 
 const $ = (id) => document.getElementById(id);
 
@@ -9,6 +64,7 @@ const state = {
   origin: null,        // airport record
   duration: 25,        // wheel minutes
   dest: null,          // { airport, mins, km }
+  fare: null,          // { airline, cls: "Y"|"J", price }
   flightNo: "",
   task: "",
   totalSeconds: 0,
@@ -222,10 +278,69 @@ function renderDestinations() {
 
 function selectDestination(r) {
   state.dest = { airport: r.a, mins: r.mins, km: Math.round(r.km) };
-  state.flightNo = "FF " + (100 + Math.floor(Math.random() * 900));
-  fillTicket();
-  show("screen-ticket");
+  state.fare = null;
+  renderFares();
+  show("screen-fare");
 }
+
+/* ---------- Fare selection ---------- */
+
+const CLASS_NAMES = { Y: "Economy", J: "Business" };
+
+function renderFares() {
+  const o = state.origin, d = state.dest;
+  $("fare-route-city").textContent = `${o[2]} → ${d.airport[2]}`;
+  $("fare-route").textContent = `${o[0]} → ${d.airport[0]} · ${fmtMins(d.mins)} · ${d.km.toLocaleString()} km`;
+
+  const list = $("airline-list");
+  list.innerHTML = "";
+
+  for (const entry of fareBoard(o[0], d.airport[0], d.km)) {
+    const al = entry.airline;
+    const li = document.createElement("li");
+    li.className = "airline" + (entry.onRoute ? "" : " off");
+
+    const fares = document.createElement("div");
+    fares.className = "al-fares";
+    if (!entry.onRoute) {
+      fares.innerHTML = `<span class="al-note">Not on this route</span>`;
+    } else {
+      fares.appendChild(fareButton(al, "Y", entry.eco));
+      if (entry.biz) fares.appendChild(fareButton(al, "J", entry.biz));
+      else fares.insertAdjacentHTML("beforeend", `<span class="al-note">Economy only</span>`);
+    }
+
+    li.innerHTML =
+      `<span class="al-logo">${al.logo}</span>` +
+      `<div class="al-info"><span class="al-tier">${al.tier}</span>` +
+      `<span class="al-name">${al.name}</span><span class="al-tag">${al.tag}</span></div>`;
+    li.appendChild(fares);
+    list.appendChild(li);
+  }
+}
+
+function fareButton(al, cls, fare) {
+  const btn = document.createElement("button");
+  btn.className = "fare-btn" + (fare.sold ? " sold" : "");
+  btn.innerHTML =
+    `<span class="fb-class">${CLASS_NAMES[cls]}</span>` +
+    (fare.sold
+      ? `<span class="fb-price">$${fare.price}</span><span class="fb-soldout">SOLD OUT</span>`
+      : `<span class="fb-price">$${fare.price}</span>`);
+  if (fare.sold) {
+    btn.disabled = true;
+  } else {
+    btn.addEventListener("click", () => {
+      state.fare = { airline: al, cls, price: fare.price };
+      state.flightNo = "FF " + (100 + Math.floor(Math.random() * 900));
+      fillTicket();
+      show("screen-ticket");
+    });
+  }
+  return btn;
+}
+
+$("btn-fare-back").addEventListener("click", () => show("screen-book"));
 
 function fillTicket() {
   const o = state.origin, d = state.dest;
@@ -243,7 +358,13 @@ function fillTicket() {
   $("t-dur").textContent = fmtMins(d.mins);
   $("t-dist").textContent = d.km.toLocaleString() + " km";
   $("t-gate").textContent = "ABCD"[Math.floor(Math.random() * 4)] + (1 + Math.floor(Math.random() * 24));
-  $("t-seat").textContent = (1 + Math.floor(Math.random() * 30)) + "ACDF"[Math.floor(Math.random() * 4)];
+  const biz = state.fare.cls === "J";
+  $("t-seat").textContent = biz
+    ? (1 + Math.floor(Math.random() * 4)) + "AF"[Math.floor(Math.random() * 2)]
+    : (5 + Math.floor(Math.random() * 26)) + "ACDF"[Math.floor(Math.random() * 4)];
+  $("t-airline").innerHTML = `${state.fare.airline.logo}<span>${state.fare.airline.name.toUpperCase()}</span>`;
+  $("t-class").textContent = `${CLASS_NAMES[state.fare.cls]} (${state.fare.cls})`;
+  $("t-fare").textContent = "$" + state.fare.price;
   $("t-task").textContent = state.task || "Deep focus";
   $("stub-codes").textContent = `${o[0]} → ${d.airport[0]}`;
   $("stub-flight").textContent = state.flightNo;
@@ -286,6 +407,7 @@ function startFlight() {
   $("fl-from").textContent = state.origin[0];
   $("fl-to").textContent = d.airport[0];
   $("fl-task").textContent = state.task || "";
+  $("fl-fare").textContent = `${state.fare.airline.name} · ${CLASS_NAMES[state.fare.cls]}`;
   $("btn-hold").textContent = "Hold";
   $("btn-divert").textContent = "Divert";
   $("btn-divert").classList.remove("armed");
@@ -383,6 +505,8 @@ function land(completed) {
     from: state.origin[0],
     to: d[0],
     city: d[2],
+    airline: state.fare ? state.fare.airline.name.split(" ")[0] : "",
+    cls: state.fare ? state.fare.cls : "",
     mins: state.dest.mins,
     focused: completed ? state.dest.mins : focusedMin,
     km: completed ? state.dest.km : flownKm,
@@ -453,7 +577,7 @@ function renderHistory() {
     li.innerHTML =
       `<span class="h-date">${date}</span>` +
       `<span class="h-route">${e.from} → ${e.to}</span>` +
-      `<span class="h-city">${e.city}</span>` +
+      `<span class="h-city">${e.city}${e.airline ? ` · ${e.airline} ${e.cls}` : ""}</span>` +
       `<span class="h-mins">${fmtMins(e.focused || 0)}</span>` + chip;
     list.appendChild(li);
   }
@@ -463,10 +587,18 @@ $("nav-history").addEventListener("click", () => { renderHistory(); show("screen
 $("btn-see-history").addEventListener("click", () => { renderHistory(); show("screen-history"); });
 $("btn-log-back").addEventListener("click", () => show("screen-book"));
 
-/* ---------- Cabin audio (WebAudio, no assets) ---------- */
+/* ---------- Cabin audio ----------
+   Economy: synthesized cabin hum (WebAudio, no assets).
+   Business: in-flight music via hidden YouTube embed (audio only);
+   where external embeds are blocked (e.g. hosted artifact CSP),
+   falls back to a synthesized first-class lounge pad. */
 
 let audioCtx = null;
-let audioNodes = null;
+let audioNodes = null;   // economy hum
+let ytFrame = null;      // business: youtube iframe
+let padNodes = null;     // business: fallback lounge pad
+let audioSession = 0;    // guards async fallback races
+let ytProbe = null;      // cached reachability check
 
 function ctx() {
   audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
@@ -475,6 +607,103 @@ function ctx() {
 }
 
 function startAudio() {
+  if (state.fare && state.fare.cls === "J") startBusinessAudio();
+  else startHum();
+}
+
+function stopAudio() {
+  audioSession++;
+  stopHum();
+  if (ytFrame) { ytFrame.remove(); ytFrame = null; }
+  stopPad();
+}
+
+function probeYouTube() {
+  if (!ytProbe) {
+    ytProbe = Promise.race([
+      fetch("https://www.youtube.com/favicon.ico", { mode: "no-cors" }).then(() => true, () => false),
+      new Promise((res) => setTimeout(() => res(false), 2500)),
+    ]);
+  }
+  return ytProbe;
+}
+
+function startBusinessAudio() {
+  if (ytFrame || padNodes) return;
+  const session = ++audioSession;
+  // Create the frame inside the user-gesture call so autoplay is allowed
+  const f = document.createElement("iframe");
+  f.src = `https://www.youtube.com/embed/${BUSINESS_YT_ID}?autoplay=1&loop=1&playlist=${BUSINESS_YT_ID}&controls=0`;
+  f.allow = "autoplay";
+  f.setAttribute("aria-hidden", "true");
+  f.tabIndex = -1;
+  f.style.cssText = "position:fixed;bottom:0;left:0;width:2px;height:2px;opacity:0.01;border:0;pointer-events:none;";
+  document.body.appendChild(f);
+  ytFrame = f;
+  probeYouTube().then((ok) => {
+    if (ok || session !== audioSession) return;
+    if (ytFrame) { ytFrame.remove(); ytFrame = null; }
+    startPad();
+  });
+}
+
+/* Fallback lounge pad: slow warm chords over a faint hum */
+const PAD_CHORDS = [
+  [130.81, 196.00, 246.94, 329.63], // Cmaj7
+  [110.00, 164.81, 220.00, 261.63], // Am7
+  [174.61, 220.00, 261.63, 329.63], // Fmaj7
+  [98.00, 146.83, 246.94, 293.66],  // G6
+];
+
+function startPad() {
+  if (padNodes) return;
+  const ac = ctx();
+  const master = ac.createGain();
+  master.gain.setValueAtTime(0.0001, ac.currentTime);
+  master.gain.exponentialRampToValueAtTime(1, ac.currentTime + 3);
+  master.connect(ac.destination);
+
+  const hum = ac.createOscillator();
+  hum.frequency.value = 55;
+  const humGain = ac.createGain();
+  humGain.gain.value = 0.018;
+  hum.connect(humGain).connect(master);
+  hum.start();
+
+  let chordIdx = 0;
+  function playChord() {
+    const t = ac.currentTime;
+    for (const freq of PAD_CHORDS[chordIdx % PAD_CHORDS.length]) {
+      const osc = ac.createOscillator();
+      osc.frequency.value = freq;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.028, t + 2.6);
+      g.gain.setValueAtTime(0.028, t + 4.4);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 7.4);
+      osc.connect(g).connect(master);
+      osc.start(t);
+      osc.stop(t + 7.6);
+    }
+    chordIdx++;
+  }
+  playChord();
+  const interval = setInterval(playChord, 7000);
+  padNodes = { hum, master, interval };
+}
+
+function stopPad() {
+  if (!padNodes) return;
+  const { hum, master, interval } = padNodes;
+  clearInterval(interval);
+  const t = audioCtx.currentTime;
+  master.gain.setValueAtTime(master.gain.value, t);
+  master.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+  setTimeout(() => { hum.stop(); master.disconnect(); }, 700);
+  padNodes = null;
+}
+
+function startHum() {
   if (audioNodes) return;
   const ac = ctx();
 
@@ -516,7 +745,7 @@ function startAudio() {
   audioNodes = { noise, hum, hum2, master };
 }
 
-function stopAudio() {
+function stopHum() {
   if (!audioNodes) return;
   const { noise, hum, hum2, master } = audioNodes;
   const t = audioCtx.currentTime;

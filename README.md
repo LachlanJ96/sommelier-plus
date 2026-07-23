@@ -8,17 +8,23 @@ A minimalist, flight-themed deep-focus timer inspired by [focusflight.net](https
    the time wheel to your focus length. The app computes which airports are
    actually in range (haversine distance at ~900 km/h cruise) and lists them
    with real distances and flight times.
-2. **Ticket** — a boarding pass is issued with flight number, gate, seat,
+2. **Fare** — choose between three carriers — Hopper Air (budget, economy only),
+   Meridian Airways (mid-range) and Aurum Air (premium) — in Economy or
+   Business. Availability is seeded per route and day: some carriers don't fly
+   the route, some classes sell out. Business class plays in-flight music
+   (YouTube audio, with a synthesized lounge-pad fallback where embeds are
+   blocked).
+3. **Ticket** — a boarding pass is issued with flight number, gate, seat,
    departure/arrival times, and your mission written on it.
-3. **Tear & board** — the ticket physically tears along the perforation
+4. **Tear & board** — the ticket physically tears along the perforation
    (with a paper-tear sound), and the flight begins.
-4. **Fly** — a dark flight-deck screen: thin-numeral countdown, route progress
+5. **Fly** — a dark flight-deck screen: thin-numeral countdown, route progress
    line, live telemetry (altitude, ground speed, km to go), and flight phases
    (climb → cruise → descent → final approach). Cabin ambience is synthesized
    with the Web Audio API — no audio files.
-5. **Divert** — quitting early triggers a breaking-news alert before logging
+6. **Divert** — quitting early triggers a breaking-news alert before logging
    the flight as diverted. Landing plays the cabin chime.
-6. **Flight log** — every ticket is kept in history with a LANDED or DIVERTED
+7. **Flight log** — every ticket is kept in history with a LANDED or DIVERTED
    status, plus lifetime focused minutes and kilometres flown (localStorage).
 
 ## Running it

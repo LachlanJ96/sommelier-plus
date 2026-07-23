@@ -165,6 +165,45 @@ main.screen.active {
 .di-meta { margin-left: auto; font-family: var(--mono); font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
 .di-meta b { color: var(--ink); font-weight: 600; }
 
+/* ---------- Fare selection ---------- */
+
+.fare { max-width: 640px; }
+.fare-title { font-size: clamp(1.5rem, 5vw, 2.1rem); font-weight: 300; letter-spacing: -0.01em; }
+.fare-route { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.08em; margin: 0.4rem 0 1.6rem; }
+
+.airline-list { list-style: none; border-top: 1px solid var(--line); margin-bottom: 1rem; }
+.airline {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  padding: 1.05rem 0.2rem; border-bottom: 1px solid var(--line);
+}
+.airline.off { opacity: 0.4; }
+.al-logo { flex: 0 0 auto; width: 38px; height: 38px; }
+.al-logo svg { width: 100%; height: 100%; display: block; }
+.al-info { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.al-name { font-weight: 600; font-size: 0.98rem; }
+.al-tag { font-size: 0.74rem; color: var(--muted); }
+.al-tier {
+  font-size: 0.58rem; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 0.1rem;
+}
+.al-fares { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; }
+.al-note { font-size: 0.74rem; color: var(--muted); font-style: italic; }
+
+.fare-btn {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem;
+  background: none; border: 1px solid var(--line); border-radius: 2px;
+  padding: 0.5rem 0.85rem; min-width: 6.4rem; cursor: pointer;
+  font-family: var(--sans); color: var(--ink); text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.fare-btn:hover { border-color: var(--accent); }
+.fare-btn .fb-class { font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.fare-btn .fb-price { font-family: var(--mono); font-size: 0.95rem; font-weight: 600; }
+.fare-btn.sold { cursor: not-allowed; opacity: 0.55; }
+.fare-btn.sold:hover { border-color: var(--line); }
+.fare-btn.sold .fb-price { text-decoration: line-through; font-weight: 400; }
+.fare-btn.sold .fb-soldout { font-size: 0.6rem; letter-spacing: 0.12em; color: var(--bad); font-weight: 700; }
+
 /* ---------- Ticket ---------- */
 
 #screen-ticket.active { display: flex; flex-direction: column; align-items: center; }
@@ -183,7 +222,11 @@ main.screen.active {
   padding-bottom: 1rem; margin-bottom: 1.3rem;
   border-bottom: 1px solid var(--line);
 }
-.ticket-airline { font-size: 0.68rem; letter-spacing: 0.26em; font-weight: 700; }
+.ticket-airline {
+  font-size: 0.68rem; letter-spacing: 0.26em; font-weight: 700;
+  display: flex; align-items: center; gap: 0.55rem;
+}
+.ticket-airline svg { width: 22px; height: 22px; }
 .ticket-no { font-size: 0.8rem; color: var(--muted); }
 
 .ticket-route { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.4rem; }
@@ -321,6 +364,7 @@ main.screen.active {
   font-weight: 200; line-height: 1.05; letter-spacing: 0.01em;
 }
 .fl-task { font-size: 0.95rem; color: rgba(242,242,239,0.75); min-height: 1.3em; font-weight: 300; }
+.fl-fare { font-size: 0.64rem; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(242,242,239,0.4); margin-top: 0.5rem; }
 
 .fl-telemetry {
   position: relative; z-index: 2;
