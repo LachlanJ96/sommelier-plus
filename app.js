@@ -2,7 +2,7 @@
 
 const CRUISE_KMH = 900;
 const DURATIONS = [10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 105, 120, 150, 180, 240];
-const BUSINESS_YT_ID = "L9iFUdkIkBE"; // in-flight music for business class
+const BUSINESS_YT_ID = "NHOFkcun06s"; // the app's in-flight music soundtrack
 
 const AIRLINES = [
   {
