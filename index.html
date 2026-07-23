@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FocusFlight — book a flight, land your focus</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✈️</text></svg>" />
+</head>
+<body>
+
+  <!-- ============ BOOKING SCREEN ============ -->
+  <section id="screen-booking" class="screen active">
+    <header class="brand">
+      <div class="brand-logo">✈</div>
+      <h1>FocusFlight</h1>
+      <p class="tagline">Book a flight. Put your phone in airplane mode. Land your focus.</p>
+    </header>
+
+    <div class="booking-card">
+      <div class="route-header">
+        <div class="airport">
+          <span class="airport-code">DTR</span>
+          <span class="airport-name">Distraction Intl.</span>
+        </div>
+        <div class="route-arrow">→</div>
+        <div class="airport">
+          <span class="airport-code" id="picked-code">···</span>
+          <span class="airport-name" id="picked-city">Choose a destination</span>
+        </div>
+      </div>
+
+      <p class="section-label">Destinations · flight time = focus time</p>
+      <div class="destinations" id="destinations"></div>
+
+      <div class="custom-row">
+        <label for="custom-minutes">Or charter your own flight:</label>
+        <input type="number" id="custom-minutes" min="1" max="360" placeholder="minutes" />
+        <button class="btn-ghost" id="btn-charter">Charter</button>
+      </div>
+
+      <div class="task-row">
+        <label for="task-input">What are you focusing on this flight?</label>
+        <input type="text" id="task-input" maxlength="60" placeholder="e.g. Write the report" />
+      </div>
+
+      <button class="btn-primary" id="btn-book" disabled>Book ticket</button>
+
+      <p class="miles" id="miles-flown"></p>
+    </div>
+  </section>
+
+  <!-- ============ BOARDING PASS SCREEN ============ -->
+  <section id="screen-ticket" class="screen">
+    <div class="ticket" id="ticket">
+      <div class="ticket-main">
+        <div class="ticket-top">
+          <span class="ticket-airline">✈ FOCUSFLIGHT AIRWAYS</span>
+          <span class="ticket-class">DEEP FOCUS CLASS</span>
+        </div>
+        <div class="ticket-route">
+          <div>
+            <span class="t-code">DTR</span>
+            <span class="t-city">Distraction Intl.</span>
+          </div>
+          <div class="t-plane">— ✈ —</div>
+          <div>
+            <span class="t-code" id="t-dest-code">SFO</span>
+            <span class="t-city" id="t-dest-city">San Francisco</span>
+          </div>
+        </div>
+        <div class="ticket-grid">
+          <div><span class="t-label">Passenger</span><span class="t-value" id="t-passenger">FOCUSED TRAVELLER</span></div>
+          <div><span class="t-label">Flight</span><span class="t-value" id="t-flight">FF 214</span></div>
+          <div><span class="t-label">Gate</span><span class="t-value" id="t-gate">B7</span></div>
+          <div><span class="t-label">Seat</span><span class="t-value" id="t-seat">12A</span></div>
+          <div><span class="t-label">Flight time</span><span class="t-value" id="t-duration">25 MIN</span></div>
+          <div><span class="t-label">Mission</span><span class="t-value" id="t-task">—</span></div>
+        </div>
+      </div>
+      <div class="ticket-stub">
+        <span class="stub-code" id="stub-code">SFO</span>
+        <span class="stub-flight" id="stub-flight">FF 214</span>
+        <div class="barcode"></div>
+      </div>
+    </div>
+
+    <div class="ticket-actions">
+      <button class="btn-ghost" id="btn-back">← Change flight</button>
+      <button class="btn-primary" id="btn-board">Board &amp; take off</button>
+    </div>
+    <p class="hint">Tip: put your phone in airplane mode for real. ✈</p>
+  </section>
+
+  <!-- ============ FLIGHT SCREEN ============ -->
+  <section id="screen-flight" class="screen">
+    <div class="sky" id="sky">
+      <div class="stars"></div>
+      <div class="clouds clouds-far"></div>
+      <div class="clouds clouds-near"></div>
+      <div class="plane-wrap"><div class="plane">✈</div></div>
+    </div>
+
+    <div class="hud">
+      <div class="hud-route">
+        <span>DTR</span>
+        <div class="hud-track"><div class="hud-progress" id="hud-progress"></div><div class="hud-dot" id="hud-dot">✈</div></div>
+        <span id="hud-dest">SFO</span>
+      </div>
+      <div class="hud-timer" id="hud-timer">25:00</div>
+      <div class="hud-task" id="hud-task"></div>
+      <div class="hud-status" id="hud-status">Cruising at 36,000 ft</div>
+      <div class="hud-controls">
+        <button class="btn-hud" id="btn-audio" title="Cabin ambience">🔊 Cabin audio</button>
+        <button class="btn-hud" id="btn-pause">⏸ Hold</button>
+        <button class="btn-hud btn-danger" id="btn-divert">Divert ✕</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ARRIVAL SCREEN ============ -->
+  <section id="screen-arrival" class="screen">
+    <div class="arrival-card">
+      <div class="arrival-emoji">🛬</div>
+      <h2 id="arrival-title">Welcome to San Francisco</h2>
+      <p id="arrival-sub">You focused for 25 minutes without leaving your seat.</p>
+      <p class="arrival-miles" id="arrival-miles"></p>
+      <button class="btn-primary" id="btn-again">Book another flight</button>
+    </div>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,261 @@
+/* ============ FocusFlight ============ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --ink: #1b2a41;
+  --ink-soft: #5b6b82;
+  --paper: #fdfbf7;
+  --accent: #e8543f;
+  --accent-dark: #c8402e;
+  --sky-day-top: #6ab7e8;
+  --sky-day-bottom: #cfe9f8;
+}
+
+html, body { height: 100%; }
+
+body {
+  font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  color: var(--ink);
+  background: linear-gradient(180deg, #86c5ec 0%, #d8eefb 100%);
+  min-height: 100vh;
+}
+
+.screen { display: none; min-height: 100vh; }
+.screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem 1rem; }
+
+/* ---------- Booking ---------- */
+
+.brand { text-align: center; margin-bottom: 1.5rem; }
+.brand-logo {
+  width: 56px; height: 56px; margin: 0 auto 0.5rem;
+  background: var(--ink); color: #fff; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.6rem; transform: rotate(-45deg);
+}
+.brand h1 { font-size: 2rem; letter-spacing: 0.02em; }
+.tagline { color: var(--ink-soft); margin-top: 0.25rem; }
+
+.booking-card {
+  background: var(--paper); border-radius: 18px; padding: 1.75rem;
+  width: min(560px, 94vw);
+  box-shadow: 0 20px 50px rgba(20, 40, 70, 0.25);
+}
+
+.route-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 1.1rem; border-bottom: 2px dashed #d9d2c5; margin-bottom: 1.1rem;
+}
+.airport { display: flex; flex-direction: column; }
+.airport:last-child { text-align: right; }
+.airport-code { font-size: 2rem; font-weight: 700; letter-spacing: 0.06em; }
+.airport-name { color: var(--ink-soft); font-size: 0.85rem; }
+.route-arrow { font-size: 1.5rem; color: var(--accent); }
+
+.section-label {
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--ink-soft); margin-bottom: 0.6rem;
+}
+
+.destinations { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.55rem; }
+.dest-btn {
+  border: 1.5px solid #e3dccd; background: #fff; border-radius: 12px;
+  padding: 0.6rem 0.7rem; cursor: pointer; text-align: left;
+  font-family: inherit; color: var(--ink);
+  transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+.dest-btn:hover { border-color: var(--accent); transform: translateY(-1px); }
+.dest-btn.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(232, 84, 63, 0.25); background: #fff6f4; }
+.dest-btn .d-code { font-weight: 700; font-size: 1.05rem; }
+.dest-btn .d-city { display: block; font-size: 0.8rem; color: var(--ink-soft); }
+.dest-btn .d-mins { display: block; font-size: 0.78rem; color: var(--accent); font-weight: 600; margin-top: 0.15rem; }
+
+.custom-row, .task-row { display: flex; align-items: center; gap: 0.6rem; margin-top: 1rem; flex-wrap: wrap; }
+.custom-row label, .task-row label { font-size: 0.85rem; color: var(--ink-soft); }
+.custom-row input { width: 100px; }
+.task-row { flex-direction: column; align-items: stretch; }
+.task-row label { margin-bottom: -0.2rem; }
+
+input {
+  font-family: inherit; font-size: 0.95rem; color: var(--ink);
+  border: 1.5px solid #e3dccd; border-radius: 10px; padding: 0.55rem 0.7rem;
+  background: #fff; outline: none;
+}
+input:focus { border-color: var(--accent); }
+
+.btn-primary {
+  margin-top: 1.25rem; width: 100%;
+  background: var(--accent); color: #fff; border: none; border-radius: 12px;
+  padding: 0.9rem; font-size: 1.05rem; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: background 0.15s, transform 0.1s;
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-dark); transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-ghost {
+  background: none; border: 1.5px solid #cfc8ba; border-radius: 10px;
+  padding: 0.55rem 0.9rem; font-family: inherit; font-size: 0.9rem;
+  color: var(--ink); cursor: pointer;
+}
+.btn-ghost:hover { border-color: var(--ink); }
+
+.miles { text-align: center; color: var(--ink-soft); font-size: 0.82rem; margin-top: 1rem; }
+
+/* ---------- Ticket ---------- */
+
+.ticket {
+  display: flex; width: min(680px, 94vw);
+  filter: drop-shadow(0 20px 40px rgba(20, 40, 70, 0.3));
+  animation: ticket-in 0.45s ease-out;
+}
+@keyframes ticket-in { from { opacity: 0; transform: translateY(24px) rotate(-1.5deg); } to { opacity: 1; } }
+
+.ticket-main {
+  flex: 1; background: var(--paper); border-radius: 16px 0 0 16px; padding: 1.4rem 1.6rem;
+}
+.ticket-top {
+  display: flex; justify-content: space-between; font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.14em; color: var(--accent); margin-bottom: 1rem;
+}
+.ticket-class { color: var(--ink-soft); }
+
+.ticket-route { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.2rem; }
+.ticket-route > div { display: flex; flex-direction: column; }
+.ticket-route > div:last-child { text-align: right; }
+.t-code { font-size: 2.4rem; font-weight: 800; letter-spacing: 0.04em; }
+.t-city { font-size: 0.82rem; color: var(--ink-soft); }
+.t-plane { color: var(--accent); font-size: 1.1rem; letter-spacing: -0.05em; }
+
+.ticket-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem 1rem; }
+.ticket-grid > div { display: flex; flex-direction: column; }
+.t-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-soft); }
+.t-value { font-weight: 700; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ticket-stub {
+  width: 150px; background: var(--paper); border-radius: 0 16px 16px 0;
+  border-left: 2px dashed #cfc8ba; padding: 1.4rem 1rem;
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+}
+.stub-code { font-size: 1.6rem; font-weight: 800; }
+.stub-flight { color: var(--ink-soft); font-size: 0.8rem; margin-top: 0.2rem; }
+.barcode {
+  width: 100%; height: 52px; margin-top: 1rem;
+  background: repeating-linear-gradient(90deg, var(--ink) 0 2px, transparent 2px 4px, var(--ink) 4px 7px, transparent 7px 9px, var(--ink) 9px 10px, transparent 10px 14px);
+  border-radius: 3px;
+}
+
+.ticket-actions { display: flex; gap: 0.8rem; margin-top: 1.6rem; }
+.ticket-actions .btn-primary { margin-top: 0; width: auto; padding: 0.8rem 1.6rem; }
+.hint { margin-top: 1rem; color: var(--ink); opacity: 0.65; font-size: 0.85rem; }
+
+/* ---------- Flight ---------- */
+
+#screen-flight { position: relative; overflow: hidden; padding: 0; }
+#screen-flight.active { display: block; }
+
+.sky {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, var(--sky-day-top) 0%, var(--sky-day-bottom) 100%);
+  transition: background 3s linear;
+}
+.sky.night { background: linear-gradient(180deg, #0c1b33 0%, #2a3f5f 100%); }
+.sky.dusk  { background: linear-gradient(180deg, #3d4e77 0%, #e8896b 100%); }
+
+.stars {
+  position: absolute; inset: 0; opacity: 0; transition: opacity 3s linear;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 22%, #fff, transparent),
+    radial-gradient(1px 1px at 34% 12%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 55% 30%, #fff, transparent),
+    radial-gradient(1px 1px at 71% 8%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 88% 25%, #fff, transparent),
+    radial-gradient(1px 1px at 22% 42%, #fff, transparent),
+    radial-gradient(1px 1px at 64% 45%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 92% 48%, #fff, transparent);
+}
+.sky.night .stars, .sky.dusk .stars { opacity: 0.9; }
+
+.clouds { position: absolute; inset: 0; background-repeat: repeat-x; }
+.clouds-far {
+  opacity: 0.5; background-size: 900px 400px;
+  background-position-y: 55%;
+  background-image: radial-gradient(ellipse 120px 32px at 150px 200px, rgba(255,255,255,0.9), transparent 70%),
+                    radial-gradient(ellipse 90px 24px at 480px 140px, rgba(255,255,255,0.85), transparent 70%),
+                    radial-gradient(ellipse 140px 36px at 760px 240px, rgba(255,255,255,0.9), transparent 70%);
+  animation: drift 90s linear infinite;
+}
+.clouds-near {
+  opacity: 0.85; background-size: 1200px 500px;
+  background-position-y: 70%;
+  background-image: radial-gradient(ellipse 180px 44px at 220px 320px, #fff, transparent 70%),
+                    radial-gradient(ellipse 130px 34px at 640px 380px, #fff, transparent 70%),
+                    radial-gradient(ellipse 200px 50px at 1000px 300px, #fff, transparent 70%);
+  animation: drift 45s linear infinite;
+}
+@keyframes drift { from { background-position-x: 0; } to { background-position-x: -1200px; } }
+
+.plane-wrap {
+  position: absolute; left: 50%; top: 34%;
+  transform: translateX(-50%);
+  animation: bob 5s ease-in-out infinite;
+}
+.plane {
+  font-size: 4.2rem; color: #fff;
+  transform: rotate(-8deg);
+  text-shadow: 0 6px 18px rgba(0,0,0,0.25);
+}
+@keyframes bob { 0%,100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, -14px); } }
+
+.hud {
+  position: absolute; left: 50%; bottom: 6vh; transform: translateX(-50%);
+  width: min(620px, 92vw);
+  background: rgba(12, 24, 44, 0.55); backdrop-filter: blur(10px);
+  border-radius: 18px; padding: 1.3rem 1.6rem; color: #fff; text-align: center;
+}
+
+.hud-route { display: flex; align-items: center; gap: 0.8rem; font-weight: 700; letter-spacing: 0.08em; }
+.hud-track { position: relative; flex: 1; height: 4px; background: rgba(255,255,255,0.25); border-radius: 2px; }
+.hud-progress { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: #fff; border-radius: 2px; transition: width 1s linear; }
+.hud-dot {
+  position: absolute; top: 50%; left: 0%;
+  transform: translate(-50%, -50%);
+  font-size: 1rem; transition: left 1s linear;
+}
+
+.hud-timer {
+  font-size: 4rem; font-weight: 800; font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em; margin: 0.4rem 0 0.1rem;
+}
+.hud-task { font-size: 1rem; opacity: 0.95; min-height: 1.2em; }
+.hud-status { font-size: 0.8rem; opacity: 0.7; margin-top: 0.2rem; }
+
+.hud-controls { display: flex; justify-content: center; gap: 0.6rem; margin-top: 1rem; }
+.btn-hud {
+  background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.3);
+  color: #fff; border-radius: 10px; padding: 0.5rem 0.9rem;
+  font-family: inherit; font-size: 0.85rem; cursor: pointer;
+}
+.btn-hud:hover { background: rgba(255,255,255,0.25); }
+.btn-hud.off { opacity: 0.55; }
+.btn-danger:hover { background: rgba(220, 60, 60, 0.5); }
+
+/* ---------- Arrival ---------- */
+
+.arrival-card {
+  background: var(--paper); border-radius: 18px; padding: 2.5rem 2.8rem;
+  text-align: center; width: min(480px, 94vw);
+  box-shadow: 0 20px 50px rgba(20, 40, 70, 0.25);
+  animation: ticket-in 0.45s ease-out;
+}
+.arrival-emoji { font-size: 3.2rem; margin-bottom: 0.6rem; }
+.arrival-card h2 { font-size: 1.7rem; margin-bottom: 0.5rem; }
+.arrival-card p { color: var(--ink-soft); }
+.arrival-miles { margin-top: 0.8rem; font-weight: 600; color: var(--accent) !important; }
+
+@media (max-width: 560px) {
+  .t-code { font-size: 1.7rem; }
+  .ticket-stub { display: none; }
+  .ticket-main { border-radius: 16px; }
+  .hud-timer { font-size: 3rem; }
+  .ticket-grid { grid-template-columns: repeat(2, 1fr); }
+}
