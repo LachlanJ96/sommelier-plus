@@ -12,12 +12,12 @@ const AIRLINES = [
   },
   {
     id: "meridian", name: "Meridian Airways", tier: "Mid-range", tag: "The dependable daily.",
-    rate: 0.12, base: 49, hasBusiness: true, offRoute: 0.08, soldEco: 0.12, soldBiz: 0.25,
+    rate: 0.12, base: 49, hasBusiness: true, offRoute: 0.08, soldEco: 0.12, soldBiz: 0.4,
     logo: `<svg viewBox="0 0 38 38"><circle cx="19" cy="19" r="17" fill="none" stroke="#1E63D0" stroke-width="2.4"/><ellipse cx="19" cy="19" rx="8" ry="17" fill="none" stroke="#1E63D0" stroke-width="1.6"/><line x1="2" y1="19" x2="36" y2="19" stroke="#1E63D0" stroke-width="2.4"/></svg>`,
   },
   {
     id: "aurum", name: "Aurum Air", tier: "Premium", tag: "Quiet luxury at altitude.",
-    rate: 0.24, base: 120, hasBusiness: true, offRoute: 0.25, soldEco: 0.30, soldBiz: 0.15,
+    rate: 0.24, base: 120, hasBusiness: true, offRoute: 0.3, soldEco: 0.30, soldBiz: 0.3,
     logo: `<svg viewBox="0 0 38 38"><circle cx="19" cy="19" r="18" fill="#14161C"/><path d="M19 7 L27 29 L23.5 29 L19 16.5 L14.5 29 L11 29 Z" fill="#C9A54E"/><line x1="13" y1="24" x2="25" y2="24" stroke="#C9A54E" stroke-width="1.6"/></svg>`,
   },
 ];
@@ -529,7 +529,6 @@ function startFlight() {
   const d = state.dest;
   state.totalSeconds = d.mins * 60;
   state.remaining = state.totalSeconds;
-  state.endAt = Date.now() + state.totalSeconds * 1000;
   state.paused = false;
   state.flying = true;
   divertArmed = false;
@@ -538,15 +537,19 @@ function startFlight() {
   $("fl-to").textContent = d.airport[0];
   $("fl-task").textContent = state.task || "";
   $("fl-fare").textContent = `${state.fare.airline.name} · ${CLASS_NAMES[state.fare.cls]}`;
+  $("fl-timer").textContent = fmtClock(state.totalSeconds);
+  $("fl-phase").textContent = "PRE-FLIGHT";
+  $("fl-progress").style.width = "0%";
+  $("fl-marker").style.left = "0%";
   $("btn-hold").textContent = "Hold";
   $("btn-divert").textContent = "Divert";
   $("btn-divert").classList.remove("armed");
   $("news").hidden = true;
 
   show("screen-flight");
+  // Start audio inside the boarding gesture so autoplay is permitted;
+  // the pre-flight sequence plays over it.
   if (state.audioOn) startAudio();
-  // Scheduled departures may start without a user gesture, which blocks
-  // audio autoplay — invite a tap and restart audio on it.
   if (navigator.userActivation && !navigator.userActivation.hasBeenActive) {
     $("btn-audio").textContent = "Tap to start audio";
     document.addEventListener("click", () => {
@@ -557,6 +560,57 @@ function startFlight() {
       }
     }, { once: true });
   }
+  runPreflight(beginCruise);
+}
+
+/* Doors closing → safety briefing → takeoff, then the clock starts */
+
+let preflightTimers = [];
+function runPreflight(done) {
+  const pf = $("preflight");
+  const label = $("pf-label"), sub = $("pf-sub"), belt = $("pf-belt");
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    preflightTimers.forEach(clearTimeout);
+    preflightTimers = [];
+    pf.classList.add("done");
+    $("screen-flight").classList.remove("boarding");
+    preflightTimers.push(setTimeout(() => { pf.hidden = true; }, 850));
+    done();
+  };
+
+  pf.classList.remove("closed", "done");
+  $("screen-flight").classList.add("boarding");
+  belt.setAttribute("hidden", "");
+  label.textContent = "CABIN DOORS CLOSING";
+  sub.textContent = "Stow your distractions in the overhead locker";
+  pf.hidden = false;
+  $("pf-skip").onclick = finish;
+
+  preflightTimers.forEach(clearTimeout);
+  preflightTimers = [
+    setTimeout(() => pf.classList.add("closed"), 60),
+    setTimeout(() => {
+      playChime();
+      belt.removeAttribute("hidden");
+      label.textContent = "SAFETY BRIEFING IN PROGRESS";
+      sub.textContent = "Your nearest focus exit may be behind you";
+    }, 2400),
+    setTimeout(() => {
+      belt.setAttribute("hidden", "");
+      label.textContent = "CLEARED FOR TAKEOFF";
+      sub.textContent = "V1 — rotate";
+      playSpool();
+    }, 6200),
+    setTimeout(finish, 8200),
+  ];
+}
+
+function beginCruise() {
+  if (!state.flying || state.timerId) return;
+  state.endAt = Date.now() + state.totalSeconds * 1000;
   tickFlight();
   state.timerId = setInterval(tickFlight, 250);
 }
@@ -635,6 +689,7 @@ $("btn-divert").addEventListener("click", () => {
 
 function land(completed) {
   clearInterval(state.timerId);
+  state.timerId = null;
   state.flying = false;
   stopAudio();
   document.title = "FocusFlight";
@@ -758,33 +813,66 @@ function startAudio() {
 function stopAudio() {
   audioSession++;
   stopHum();
-  if (ytFrame) { ytFrame.remove(); ytFrame = null; }
+  removeYtFrame();
   stopPad();
 }
+
+let ytMsgHandler = null;
 
 function startBusinessAudio() {
   if (ytFrame || padNodes) return;
   const session = ++audioSession;
   // Hidden audio-only player. Created synchronously so a user-gesture call
-  // (boarding click) grants it autoplay permission.
+  // (boarding click) grants it autoplay permission. enablejsapi lets the
+  // embed report its real player state back over postMessage.
   const f = document.createElement("iframe");
   f.src = `https://www.youtube.com/embed/${BUSINESS_YT_ID}` +
-    `?autoplay=1&loop=1&playlist=${BUSINESS_YT_ID}&controls=0&playsinline=1`;
+    `?autoplay=1&loop=1&playlist=${BUSINESS_YT_ID}&controls=0&playsinline=1&enablejsapi=1`;
   f.allow = "autoplay";
   f.setAttribute("aria-hidden", "true");
   f.tabIndex = -1;
   f.style.cssText = "position:fixed;left:-9999px;top:0;width:220px;height:220px;border:0;";
-  let loaded = false;
-  f.addEventListener("load", () => { loaded = true; });
+
+  let playing = false;
+  const send = (obj) => {
+    try { f.contentWindow.postMessage(JSON.stringify(obj), "*"); } catch (e) { /* frame gone */ }
+  };
+  ytMsgHandler = (e) => {
+    if (!/^https:\/\/www\.youtube(-nocookie)?\.com$/.test(e.origin)) return;
+    let d = e.data;
+    if (typeof d === "string") { try { d = JSON.parse(d); } catch (err) { return; } }
+    if (!d) return;
+    if (d.event === "onReady") send({ event: "command", func: "playVideo", args: [] });
+    // playerState 1 = playing, 3 = buffering
+    const s = d.info && typeof d.info === "object" ? d.info.playerState : undefined;
+    if (s === 1 || s === 3) playing = true;
+  };
+  window.addEventListener("message", ytMsgHandler);
+
+  f.addEventListener("load", () => {
+    send({ event: "listening", id: "ff-biz", channel: "widget" });
+    // Nudge playback in case autoplay was swallowed
+    setTimeout(() => send({ event: "command", func: "playVideo", args: [] }), 700);
+    setTimeout(() => send({ event: "command", func: "playVideo", args: [] }), 2000);
+  });
+
   document.body.appendChild(f);
   ytFrame = f;
-  // If the embed never loads (blocked network/CSP/adblock), fall back
-  // to the synthesized lounge pad instead.
+
+  // Only trust actual playback. If the embed hasn't reported a playing/
+  // buffering state in time (blocked network, CSP, adblock, autoplay
+  // refusal), switch to the synthesized lounge pad so business class is
+  // never silent.
   setTimeout(() => {
-    if (session !== audioSession || loaded) return;
-    if (ytFrame) { ytFrame.remove(); ytFrame = null; }
+    if (session !== audioSession || playing) return;
+    removeYtFrame();
     startPad();
-  }, 3500);
+  }, 5000);
+}
+
+function removeYtFrame() {
+  if (ytMsgHandler) { window.removeEventListener("message", ytMsgHandler); ytMsgHandler = null; }
+  if (ytFrame) { ytFrame.remove(); ytFrame = null; }
 }
 
 /* Fallback lounge pad: slow warm chords over a faint hum */
@@ -908,6 +996,35 @@ function playChime() {
     osc.connect(gain).connect(ac.destination);
     osc.start(t); osc.stop(t + 1.3);
   });
+}
+
+function playSpool() {
+  // Rising engine spool: filtered noise sweeping up over ~1.8s
+  const ac = ctx();
+  const dur = 1.8;
+  const buffer = ac.createBuffer(1, ac.sampleRate * dur, ac.sampleRate);
+  const data = buffer.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < data.length; i++) {
+    const white = Math.random() * 2 - 1;
+    last = (last + 0.04 * white) / 1.04;
+    data[i] = last * 3;
+  }
+  const src = ac.createBufferSource();
+  src.buffer = buffer;
+  const filter = ac.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.Q.value = 1.2;
+  const t = ac.currentTime;
+  filter.frequency.setValueAtTime(120, t);
+  filter.frequency.exponentialRampToValueAtTime(900, t + dur);
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.22, t + 0.5);
+  gain.gain.setValueAtTime(0.22, t + dur - 0.3);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(filter).connect(gain).connect(ac.destination);
+  src.start();
 }
 
 function playTear() {

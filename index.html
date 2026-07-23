@@ -157,6 +157,22 @@
       <button class="btn-fl btn-fl-danger" id="btn-divert">Divert</button>
     </div>
 
+    <!-- Pre-flight sequence overlay -->
+    <div class="preflight" id="preflight" hidden>
+      <div class="pf-door pf-door-l"></div>
+      <div class="pf-door pf-door-r"></div>
+      <div class="pf-content">
+        <svg class="pf-belt" id="pf-belt" viewBox="0 0 64 32" aria-hidden="true" hidden>
+          <path d="M2 26 Q18 10 32 10 Q46 10 62 26" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+          <rect x="24" y="6" width="16" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2.4"/>
+          <line x1="32" y1="8" x2="32" y2="14" stroke="currentColor" stroke-width="2.4"/>
+        </svg>
+        <div class="pf-label mono" id="pf-label">CABIN DOORS CLOSING</div>
+        <div class="pf-sub" id="pf-sub">Stow your distractions in the overhead locker</div>
+      </div>
+      <button class="btn-fl pf-skip" id="pf-skip">I've flown before · Skip</button>
+    </div>
+
     <!-- News alert overlay -->
     <div class="news" id="news" hidden>
       <div class="news-bar">

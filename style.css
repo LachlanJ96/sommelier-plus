@@ -426,6 +426,47 @@ main.screen.active {
 .btn-fl.off { opacity: 0.45; }
 .btn-fl-danger:hover, .btn-fl-danger.armed { border-color: #E8604F; color: #E8604F; }
 
+/* Pre-flight sequence */
+.preflight {
+  position: absolute; inset: 0; z-index: 25;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.8s ease;
+}
+.preflight[hidden] { display: none; }
+.preflight.done { opacity: 0; pointer-events: none; }
+
+.pf-door {
+  position: absolute; top: 0; bottom: 0; width: 50.5%;
+  background: linear-gradient(90deg, #1A1C21 0%, #121418 100%);
+  transition: transform 2s cubic-bezier(0.65, 0.05, 0.35, 1);
+}
+.pf-door-l { left: 0; transform: translateX(-102%); box-shadow: inset -14px 0 26px rgba(0,0,0,0.55); }
+.pf-door-r { right: 0; transform: translateX(102%); box-shadow: inset 14px 0 26px rgba(0,0,0,0.55); background: linear-gradient(270deg, #1A1C21 0%, #121418 100%); }
+.pf-door::after {
+  content: ""; position: absolute; top: 18%; width: 74px; height: 110px;
+  border-radius: 40px; border: 2px solid rgba(242,242,239,0.14);
+}
+.pf-door-l::after { right: 16%; }
+.pf-door-r::after { left: 16%; }
+.preflight.closed .pf-door-l, .preflight.closed .pf-door-r { transform: translateX(0); }
+
+.pf-content {
+  position: relative; z-index: 2; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 0.9rem;
+  padding: 0 1.5rem;
+}
+.pf-belt { width: 84px; color: rgba(242,242,239,0.85); animation: belt-pulse 1.6s ease-in-out infinite; }
+.pf-belt[hidden] { display: none; }
+
+/* Keep the flight deck dark until the doors sequence finishes */
+.fl-route, .fl-center, .fl-telemetry, .fl-controls { transition: opacity 0.8s ease; }
+.flight.boarding .fl-route, .flight.boarding .fl-center,
+.flight.boarding .fl-telemetry, .flight.boarding .fl-controls { opacity: 0; }
+@keyframes belt-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+.pf-label { font-size: 1rem; letter-spacing: 0.34em; color: #F2F2EF; }
+.pf-sub { font-size: 0.82rem; color: rgba(242,242,239,0.55); font-weight: 300; }
+.pf-skip { position: absolute; bottom: 7vh; z-index: 2; opacity: 0.7; }
+
 /* News alert */
 .news {
   position: absolute; inset: 0; z-index: 30;
