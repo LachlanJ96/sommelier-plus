@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FocusFlight</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✈️</text></svg>" />
+</head>
+<body>
+
+  <header class="top" id="top-bar">
+    <span class="wordmark">FOCUS<b>FLIGHT</b></span>
+    <button class="nav-link" id="nav-history">History</button>
+  </header>
+
+  <!-- ============ BOOK ============ -->
+  <main id="screen-book" class="screen active">
+    <h1 class="hero">Where will this<br />focus take you?</h1>
+
+    <div class="field" id="board-field" hidden>
+      <span class="label">Departures</span>
+      <ul class="board" id="board-list"></ul>
+      <span class="fine">Scheduled flights depart on time while FocusFlight is open.</span>
+    </div>
+
+    <div class="field">
+      <span class="label">Departing from</span>
+      <div class="search-wrap">
+        <input id="origin-input" type="text" autocomplete="off" spellcheck="false"
+               placeholder="Search any airport — city, name or code" />
+        <ul id="origin-results" class="dropdown" hidden></ul>
+      </div>
+      <span class="fine" id="airport-count"></span>
+    </div>
+
+    <div class="field" id="depart-field" hidden>
+      <span class="label">Departure</span>
+      <div class="seg" id="seg-depart">
+        <button class="seg-btn on" id="seg-day">Day flight</button>
+        <button class="seg-btn" id="seg-night">☾ Night flight</button>
+      </div>
+      <span class="fine" id="night-hint" hidden>Cabin lights dimmed, no briefing, the night playlist on repeat. Flight departs at night.</span>
+    </div>
+
+    <div class="field" id="time-field" hidden>
+      <span class="label">Flight time <em id="range-hint" class="range-hint"></em></span>
+      <div class="wheel-frame">
+        <div class="wheel" id="wheel" tabindex="0" aria-label="Focus duration"></div>
+        <div class="wheel-cursor" aria-hidden="true"></div>
+      </div>
+    </div>
+
+    <div class="field" id="dest-field" hidden>
+      <span class="label">In range from <span id="range-origin"></span></span>
+      <ul class="dest-list" id="dest-list"></ul>
+    </div>
+
+  </main>
+
+  <!-- ============ FARE ============ -->
+  <main id="screen-fare" class="screen">
+    <div class="fare">
+      <span class="label">Select carrier &amp; class</span>
+      <h2 class="fare-title" id="fare-route-city">Sydney → Gold Coast</h2>
+      <p class="fare-route mono" id="fare-route">SYD → OOL · 45 min · 681 km</p>
+      <ul class="airline-list" id="airline-list"></ul>
+      <p class="fine">Availability varies by route and day.</p>
+      <button class="btn-text" id="btn-fare-back">← Change flight</button>
+    </div>
+  </main>
+
+  <!-- ============ TICKET ============ -->
+  <main id="screen-ticket" class="screen">
+    <div class="ticket" id="ticket">
+      <div class="ticket-main">
+        <div class="ticket-head">
+          <span class="ticket-airline" id="t-airline">FOCUSFLIGHT</span>
+          <span class="ticket-no mono" id="t-flight">FF 212</span>
+        </div>
+        <div class="ticket-route">
+          <div class="t-end">
+            <span class="t-code" id="t-from-code">···</span>
+            <span class="t-city" id="t-from-city"></span>
+          </div>
+          <svg class="t-arc" viewBox="0 0 120 32" aria-hidden="true">
+            <path d="M4 28 Q60 -8 116 28" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 4"/>
+            <circle cx="60" cy="10" r="2.4" fill="currentColor"/>
+          </svg>
+          <div class="t-end t-end-right">
+            <span class="t-code" id="t-to-code">···</span>
+            <span class="t-city" id="t-to-city"></span>
+          </div>
+        </div>
+        <div class="ticket-grid mono">
+          <div><span class="g-label">Departs</span><span id="t-dep">—</span></div>
+          <div><span class="g-label">Arrives</span><span id="t-arr">—</span></div>
+          <div><span class="g-label">Duration</span><span id="t-dur">—</span></div>
+          <div><span class="g-label">Distance</span><span id="t-dist">—</span></div>
+          <div><span class="g-label">Gate</span><span id="t-gate">—</span></div>
+          <div><span class="g-label">Seat</span><span id="t-seat">—</span></div>
+          <div><span class="g-label">Class</span><span id="t-class">—</span></div>
+          <div><span class="g-label">Fare</span><span id="t-fare">—</span></div>
+        </div>
+        <div class="ticket-mission">
+          <span class="g-label">Mission</span>
+          <span id="t-task" class="t-task-line">Deep focus</span>
+        </div>
+      </div>
+      <div class="ticket-stub">
+        <div class="stub-top mono">
+          <span id="stub-codes">··· → ···</span>
+          <span id="stub-flight">FF 212</span>
+        </div>
+        <div class="barcode" aria-hidden="true"></div>
+        <span class="stub-note">TEAR TO BOARD</span>
+      </div>
+    </div>
+
+    <div class="mission-row">
+      <input id="task-input" type="text" maxlength="60" autocomplete="off"
+             placeholder="Write your mission on the ticket (optional)" />
+    </div>
+
+    <div class="ticket-actions">
+      <button class="btn-text" id="btn-back">← Change flight</button>
+      <button class="btn-solid" id="btn-tear">Tear ticket · Board</button>
+    </div>
+
+    <div class="sched-row">
+      <span class="fine">Or schedule departure:</span>
+      <input type="time" id="sched-time" class="mono" />
+      <button class="btn-text btn-underline" id="btn-sched">Add to departures board</button>
+    </div>
+  </main>
+
+  <!-- ============ FLIGHT ============ -->
+  <div id="screen-flight" class="screen flight">
+    <div class="fl-stars" aria-hidden="true"></div>
+    <div class="fl-gmap" id="fl-gmap" hidden></div>
+
+    <div class="fl-route mono">
+      <span id="fl-from">···</span>
+      <div class="fl-track">
+        <div class="fl-progress" id="fl-progress"></div>
+        <div class="fl-marker" id="fl-marker"></div>
+      </div>
+      <span id="fl-to">···</span>
+    </div>
+
+    <div class="fl-map-wrap">
+      <canvas id="fl-map"></canvas>
+    </div>
+
+    <div class="fl-center">
+      <span class="fl-phase" id="fl-phase">BOARDING</span>
+      <div class="fl-timer mono" id="fl-timer">00:00</div>
+      <p class="fl-task" id="fl-task"></p>
+      <p class="fl-fare mono" id="fl-fare"></p>
+    </div>
+
+    <div class="phase-flash mono" id="phase-flash" hidden></div>
+
+    <div class="fl-telemetry mono" id="fl-telemetry">
+      <div class="tel-block tel-big">
+        <span class="tel-label">Distance remaining</span>
+        <span class="tel-value"><b id="tel-togo">—</b> km</span>
+      </div>
+      <div class="tel-block">
+        <span class="tel-label">Altitude</span>
+        <span class="tel-value"><b id="tel-alt">0</b> m</span>
+      </div>
+      <div class="tel-block">
+        <span class="tel-label">Ground speed</span>
+        <span class="tel-value"><b id="tel-spd">0</b> km/h</span>
+      </div>
+    </div>
+
+    <div class="fl-controls">
+      <button class="btn-fl" id="btn-audio">Cabin audio · on</button>
+      <button class="btn-fl" id="btn-map">Map · radar</button>
+      <button class="btn-fl" id="btn-hold">Hold</button>
+      <button class="btn-fl btn-fl-danger" id="btn-divert">Divert</button>
+    </div>
+
+    <!-- Pre-flight sequence overlay -->
+    <div class="preflight" id="preflight" hidden>
+      <div class="pf-door pf-door-l"></div>
+      <div class="pf-door pf-door-r"></div>
+      <div class="pf-content">
+        <svg class="pf-belt" id="pf-belt" viewBox="0 0 64 32" aria-hidden="true" hidden>
+          <path d="M2 26 Q18 10 32 10 Q46 10 62 26" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+          <rect x="24" y="6" width="16" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2.4"/>
+          <line x1="32" y1="8" x2="32" y2="14" stroke="currentColor" stroke-width="2.4"/>
+        </svg>
+        <div class="pf-label mono" id="pf-label">CABIN DOORS CLOSING</div>
+        <div class="pf-sub" id="pf-sub">Stow your distractions in the overhead locker</div>
+      </div>
+      <button class="btn-fl pf-skip" id="pf-skip">I've flown before · Skip</button>
+    </div>
+
+    <!-- News alert overlay -->
+    <div class="news" id="news" hidden>
+      <div class="news-bar">
+        <span class="news-badge">NEWS ALERT</span>
+        <p class="news-text" id="news-text"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ARRIVAL ============ -->
+  <main id="screen-arrival" class="screen">
+    <div class="arrival">
+      <span class="label" id="arr-label">Arrived</span>
+      <h2 class="arr-title" id="arr-title">Landed</h2>
+      <p class="arr-sub" id="arr-sub"></p>
+      <p class="arr-total mono" id="arr-total"></p>
+      <div class="arr-actions">
+        <button class="btn-solid" id="btn-again">New flight</button>
+        <button class="btn-text" id="btn-see-history">History</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============ HISTORY ============ -->
+  <main id="screen-history" class="screen">
+    <div class="history">
+      <div class="history-head">
+        <h2>Flight log</h2>
+        <span class="fine mono" id="log-total"></span>
+      </div>
+      <ul id="history-list" class="history-list"></ul>
+      <p class="fine" id="history-empty" hidden>No flights yet. Your landed and diverted tickets will appear here.</p>
+      <button class="btn-text" id="btn-log-back">← Back</button>
+    </div>
+  </main>
+
+  <script src="airports.js"></script>
+  <script src="worldmap.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
