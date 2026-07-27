@@ -872,21 +872,19 @@ function drawFlightMap(progress) {
   const px = (n) => n * flMap.dpr;
   ctx2d.clearRect(0, 0, w, h);
 
-  // Real geography: ocean wash, landmasses with coastlines, country borders
+  // Real geography: charcoal landmasses on the black deck, faint borders
   ensureWorldBBoxes();
   if (worldBBoxes) {
-    ctx2d.fillStyle = "rgba(10, 22, 40, 0.55)";
-    ctx2d.fillRect(0, 0, w, h);
-    ctx2d.fillStyle = "rgba(92, 138, 190, 0.16)";
-    ctx2d.strokeStyle = "rgba(150, 205, 255, 0.32)";
+    ctx2d.fillStyle = "rgba(244, 244, 241, 0.085)";
+    ctx2d.strokeStyle = "rgba(244, 244, 241, 0.16)";
     ctx2d.lineWidth = px(1);
     drawGeoSet(ctx2d, WORLD_LAND, worldBBoxes.land, b, w, h, true);
-    ctx2d.strokeStyle = "rgba(150, 205, 255, 0.12)";
+    ctx2d.strokeStyle = "rgba(244, 244, 241, 0.07)";
     drawGeoSet(ctx2d, WORLD_BORDERS, worldBBoxes.borders, b, w, h, false);
   }
 
-  // Graticule
-  ctx2d.strokeStyle = "rgba(140, 200, 255, 0.09)";
+  // Graticule — barely-there
+  ctx2d.strokeStyle = "rgba(244, 244, 241, 0.04)";
   ctx2d.lineWidth = px(1);
   const spanLon = b.maxLon - b.minLon, spanLat = b.maxLat - b.minLat;
   const lonStep = spanLon > 60 ? 20 : spanLon > 20 ? 10 : spanLon > 8 ? 5 : 1;
@@ -901,7 +899,7 @@ function drawFlightMap(progress) {
   }
 
   // The world as its airports — city-lights style
-  ctx2d.fillStyle = "rgba(160, 205, 255, 0.34)";
+  ctx2d.fillStyle = "rgba(244, 244, 241, 0.22)";
   for (const a of AIRPORTS) {
     for (const lonOff of [-360, 0, 360]) {
       const lon = a[5] + lonOff;
@@ -914,9 +912,9 @@ function drawFlightMap(progress) {
   const pts = flMap.path.map(([lat, lon]) => projPoint(lat, lon, w, h));
 
   // Route: remaining as dashes, flown as solid glow
-  ctx2d.strokeStyle = "rgba(160, 205, 255, 0.35)";
+  ctx2d.strokeStyle = "rgba(244, 244, 241, 0.35)";
   ctx2d.setLineDash([px(4), px(6)]);
-  ctx2d.lineWidth = px(1.4);
+  ctx2d.lineWidth = px(1.2);
   ctx2d.beginPath();
   pts.forEach(([x, y], i) => i ? ctx2d.lineTo(x, y) : ctx2d.moveTo(x, y));
   ctx2d.stroke();
@@ -924,8 +922,8 @@ function drawFlightMap(progress) {
 
   const posIdx = progress * (pts.length - 1);
   const iFull = Math.floor(posIdx);
-  ctx2d.strokeStyle = "rgba(180, 220, 255, 0.95)";
-  ctx2d.shadowColor = "rgba(140, 200, 255, 0.9)";
+  ctx2d.strokeStyle = "rgba(255, 255, 255, 0.95)";
+  ctx2d.shadowColor = "rgba(242, 179, 43, 0.65)";
   ctx2d.shadowBlur = px(6);
   ctx2d.lineWidth = px(2);
   ctx2d.beginPath();
@@ -944,17 +942,36 @@ function drawFlightMap(progress) {
   ctx2d.stroke();
   ctx2d.shadowBlur = 0;
 
-  // Endpoints
+  // Endpoints: amber airport badges with a plane glyph, like a departures tag
   const drawEndpoint = (pt, code, align) => {
     ctx2d.beginPath();
-    ctx2d.arc(pt[0], pt[1], px(3), 0, Math.PI * 2);
-    ctx2d.strokeStyle = "rgba(207, 233, 255, 0.9)";
-    ctx2d.lineWidth = px(1.4);
+    ctx2d.arc(pt[0], pt[1], px(2.4), 0, Math.PI * 2);
+    ctx2d.fillStyle = "rgba(255, 255, 255, 0.9)";
+    ctx2d.fill();
+    const labelTxt = "✈ " + code;
+    ctx2d.font = `700 ${px(10.5)}px ui-monospace, SF Mono, Menlo, monospace`;
+    const tw = ctx2d.measureText(labelTxt).width;
+    const padX = px(7), bh = px(19);
+    const bw = tw + padX * 2;
+    const bx = align === "left" ? pt[0] + px(9) : pt[0] - px(9) - bw;
+    const by = pt[1] - bh - px(8);
+    ctx2d.beginPath();
+    if (ctx2d.roundRect) ctx2d.roundRect(bx, by, bw, bh, px(4));
+    else ctx2d.rect(bx, by, bw, bh);
+    ctx2d.fillStyle = "#F2B32B";
+    ctx2d.fill();
+    ctx2d.fillStyle = "#141414";
+    ctx2d.textAlign = "left";
+    ctx2d.textBaseline = "middle";
+    ctx2d.fillText(labelTxt, bx + padX, by + bh / 2 + px(0.5));
+    ctx2d.textBaseline = "alphabetic";
+    // Leader from badge to the airport dot
+    ctx2d.strokeStyle = "rgba(242, 179, 43, 0.5)";
+    ctx2d.lineWidth = px(1);
+    ctx2d.beginPath();
+    ctx2d.moveTo(align === "left" ? bx : bx + bw, by + bh);
+    ctx2d.lineTo(pt[0], pt[1]);
     ctx2d.stroke();
-    ctx2d.fillStyle = "rgba(207, 233, 255, 0.85)";
-    ctx2d.font = `600 ${px(11)}px ui-monospace, SF Mono, Menlo, monospace`;
-    ctx2d.textAlign = align;
-    ctx2d.fillText(code, pt[0] + (align === "left" ? px(8) : -px(8)), pt[1] - px(7));
   };
   drawEndpoint(pts[0], state.origin[0], "left");
   drawEndpoint(pts[pts.length - 1], state.dest.airport[0], "right");
@@ -965,10 +982,10 @@ function drawFlightMap(progress) {
   ctx2d.save();
   ctx2d.translate(plane[0], plane[1]);
   ctx2d.rotate(angle + Math.PI / 2);
-  ctx2d.shadowColor = "rgba(180, 220, 255, 1)";
-  ctx2d.shadowBlur = px(10);
-  ctx2d.fillStyle = "#EAF4FF";
-  const s = px(9);
+  ctx2d.shadowColor = "rgba(255, 255, 255, 0.9)";
+  ctx2d.shadowBlur = px(9);
+  ctx2d.fillStyle = "#FFFFFF";
+  const s = px(10);
   ctx2d.beginPath();                       // simple jet silhouette
   ctx2d.moveTo(0, -s);                     // nose
   ctx2d.lineTo(s * 0.28, -s * 0.2);

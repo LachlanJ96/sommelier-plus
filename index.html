@@ -162,9 +162,18 @@
     <div class="phase-flash mono" id="phase-flash" hidden></div>
 
     <div class="fl-telemetry mono" id="fl-telemetry">
-      <span>ALT <b id="tel-alt">0</b> M</span>
-      <span>GS <b id="tel-spd">0</b> KM/H</span>
-      <span><b id="tel-togo">—</b> KM TO GO</span>
+      <div class="tel-block tel-big">
+        <span class="tel-label">Distance remaining</span>
+        <span class="tel-value"><b id="tel-togo">—</b> km</span>
+      </div>
+      <div class="tel-block">
+        <span class="tel-label">Altitude</span>
+        <span class="tel-value"><b id="tel-alt">0</b> m</span>
+      </div>
+      <div class="tel-block">
+        <span class="tel-label">Ground speed</span>
+        <span class="tel-value"><b id="tel-spd">0</b> km/h</span>
+      </div>
     </div>
 
     <div class="fl-controls">
