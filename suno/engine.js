@@ -488,7 +488,13 @@ function checkOutput(style, tagStyle, exclude, lyrics, userArtist, genre) {
     typed.split(/\s+/).forEach((w) => { if (w.length >= 5) names.add(w); });
   }
   const haystack = (style + ' ' + tagStyle + ' ' + exclude + ' ' + lyrics.text).toLowerCase();
-  const leaked = [...names].filter((n) => n.length > 3 && haystack.includes(n));
+  /* whole words only. A plain substring test condemns "his tools are still in
+     the shed" because there is a band called Tool. */
+  const leaked = [...names].filter((n) => {
+    if (n.length < 4) return false;
+    const re = new RegExp('\\b' + n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+    return re.test(haystack);
+  });
   if (leaked.length) {
     problems.push('Artist name in the output: ' + leaked.join(', ') + '. Remove it before generating — naming an artist can get an account struck.');
   } else {

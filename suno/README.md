@@ -7,6 +7,9 @@ a lyric sheet with the section tags already in place.
 Open `suno/index.html`. No build, no dependencies, no network calls — the
 genre and artist tables ship with it and everything is generated in the page.
 
+To hand someone a single file instead, `node build-standalone.js` inlines the
+CSS and JS into one self-contained HTML you can email or host anywhere.
+
 ## What it knows
 
 The generator is built around how v5 and v5.5 actually read their inputs:
@@ -60,6 +63,7 @@ you type finds its way into the sheet.
 | `data-lexicon.js` | the stanza banks, twelve subject domains plus a general fallback, the rap bar bank, and the cliché blocklist |
 | `engine.js` | style prompt construction, the lyric assembler, syllable counting and the output checks |
 | `app.js` | interface wiring, saved sheets, export |
+| `build-standalone.js` | optional — bundles the whole app into one HTML file |
 
 ## Using it
 

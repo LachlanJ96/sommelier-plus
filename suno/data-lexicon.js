@@ -290,7 +290,8 @@ D('night', {
 D('grief', {
   label: 'Grief & loss',
   match: ['grief', 'loss', 'died', 'death', 'funeral', 'passed away', 'mourning', 'gone forever',
-    'lost my', 'in memory', 'remember him', 'remember her', 'cancer', 'graveside', 'widow'],
+    'lost my', 'in memory', 'remember him', 'remember her', 'cancer', 'graveside', 'widow',
+    'buried', 'his ashes', 'her things', 'clearing out', 'cleaned out'],
   props: ['good jacket', 'wooden box', 'card she never sent', 'tin of buttons', 'box of tools', 'reading glasses'],
   places: ['the hospital car park', 'the church on Ellis Street', 'the front room', 'the back shed', 'the plot by the fence'],
   people: ['my mother', 'the nurse with the kind face', 'his brother', 'the priest', 'my aunt'],
@@ -329,8 +330,11 @@ D('grief', {
 
 D('vice', {
   label: 'Drink & recovery',
+  /* no bare "clean" — it matches "cleaned out his shed", which is a grief
+     song, not a recovery one */
   match: ['drinking', 'drunk', 'alcohol', 'whiskey', 'whisky', 'sober', 'sobriety', 'addiction',
-    'addict', 'recovery', 'relapse', 'rehab', 'clean', 'quit drinking', 'pills', 'smoking', 'gambling'],
+    'addict', 'recovery', 'relapse', 'rehab', 'staying clean', 'quit drinking', 'pills',
+    'smoking', 'gambling', 'off the drink'],
   props: ['green chip', 'bar mat', 'plastic cup of tea', 'folded list', 'set of keys I handed over'],
   places: ['the church hall on Tuesdays', 'the front bar', 'the bottle shop', 'the car park at eight', 'the back row'],
   people: ['my sponsor', 'the bloke who does the tea', 'my brother', 'the doctor', 'the woman who runs it'],
@@ -410,7 +414,8 @@ D('road', {
 D('defiance', {
   label: 'Defiance',
   match: ['fight', 'anger', 'angry', 'protest', 'revenge', 'rebel', 'stand up', 'resist', 'injustice',
-    'betrayal', 'betrayed', 'lied', 'liar', 'enemy', 'strike', 'rise up', 'revolution', 'power'],
+    'betrayal', 'betrayed', 'lied', 'liar', 'enemy', 'strike', 'rise up', 'revolution', 'power',
+    'laid off', 'redundancy', 'redundant', 'sacked', 'picket', 'union', 'closed the', 'shut the'],
   props: ['letter they sent', 'folded notice', 'sign we made', 'minutes of the meeting', 'list we all signed'],
   places: ['the town hall steps', 'the gate at seven', 'the depot road', 'the car park out the front', 'the back of the room'],
   people: ['the man from the office', 'the union rep', 'the councillor', 'my neighbour', 'the bloke in the suit'],
@@ -629,7 +634,10 @@ function routeTheme(theme) {
     .map((d) => {
       let s = 0;
       d.match.forEach((m) => {
-        if (t.includes(m)) s += m.length + (m.includes(' ') ? 6 : 0);
+        /* anchored to a word start, so "rent" does not fire on "parent",
+           while a stem like "work" still catches "working" */
+        const re = new RegExp('\\b' + m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        if (re.test(t)) s += m.length + (m.includes(' ') ? 6 : 0);
       });
       return { d, s };
     })
