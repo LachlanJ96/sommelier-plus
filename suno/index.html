@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Take One — Suno v5 / v5.5 prompt &amp; lyric desk</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23f4f1ea'/><text y='.85em' x='8' font-size='78' font-family='Georgia,serif' fill='%23b3271e'>1</text></svg>" />
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-in">
+    <h1 class="wordmark">TAKE<span>ONE</span></h1>
+    <p class="tagline">Style prompts and lyric sheets for Suno v5 &amp; v5.5</p>
+    <button class="ghost" id="open-library" type="button">Saved <span id="lib-count"></span></button>
+  </div>
+</header>
+
+<main class="desk">
+
+  <!-- ============================== BRIEF ============================== -->
+  <section class="brief" aria-label="Song brief">
+    <h2 class="sheet-title">The brief</h2>
+
+    <div class="field">
+      <label for="in-genre"><em>01</em> Genre</label>
+      <input id="in-genre" list="genre-list" autocomplete="off" spellcheck="false"
+             placeholder="outlaw country" />
+      <datalist id="genre-list"></datalist>
+      <p class="hint" id="genre-hint">Type anything — it'll match to the closest profile.</p>
+      <div class="chips" id="genre-chips"></div>
+    </div>
+
+    <div class="field">
+      <label for="in-theme"><em>02</em> Theme</label>
+      <textarea id="in-theme" rows="3" spellcheck="true"
+                placeholder="leaving town at four in the morning without telling anyone"></textarea>
+      <p class="hint" id="theme-hint">A situation beats an abstraction. "My dad's ute broke down on the way to the coast" gives a better song than "loss".</p>
+    </div>
+
+    <div class="field">
+      <label for="in-artist"><em>03</em> Reference artist</label>
+      <input id="in-artist" list="artist-list" autocomplete="off" spellcheck="false"
+             placeholder="Johnny Cash" />
+      <datalist id="artist-list"></datalist>
+      <p class="hint">Used as a description, never as a name. Suno blocks artist names and can strike an account for using one — this translates the reference into era, voice, instruments, mix and feel before it goes anywhere near the box.</p>
+      <div class="translation" id="translation" hidden></div>
+    </div>
+
+    <details class="more">
+      <summary>Detail</summary>
+
+      <div class="grid2">
+        <div class="field tight">
+          <label for="in-voice">Vocal</label>
+          <select id="in-voice">
+            <option value="auto">Match the reference</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="duet">Duet</option>
+            <option value="choir">Lead + choir</option>
+            <option value="instrumental">Instrumental</option>
+          </select>
+        </div>
+
+        <div class="field tight">
+          <label for="in-length">Length</label>
+          <select id="in-length">
+            <option value="short">Short — about 2 min</option>
+            <option value="standard" selected>Standard — 3 min</option>
+            <option value="long">Long — 4 min+</option>
+          </select>
+        </div>
+
+        <div class="field tight">
+          <label for="in-mood">Mood</label>
+          <input id="in-mood" autocomplete="off" placeholder="flat, unsentimental" />
+        </div>
+
+        <div class="field tight">
+          <label for="in-bpm">Tempo <span class="muted" id="bpm-read">auto</span></label>
+          <input id="in-bpm" type="range" min="0" max="200" step="2" value="0" />
+        </div>
+
+        <div class="field tight">
+          <label for="in-key">Key</label>
+          <input id="in-key" autocomplete="off" placeholder="auto" />
+        </div>
+
+        <div class="field tight">
+          <label for="in-model">Model</label>
+          <select id="in-model">
+            <option value="v5.5" selected>v5.5</option>
+            <option value="v5">v5</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field tight">
+        <label for="in-exclude">Also exclude</label>
+        <input id="in-exclude" autocomplete="off" placeholder="backing vocals, guitar solo" />
+        <p class="hint">Two or three at most. Past that the Exclude field stops steering.</p>
+      </div>
+    </details>
+
+    <div class="actions">
+      <button class="primary" id="go" type="button">Write it</button>
+      <button class="ghost" id="reroll" type="button" disabled>Reroll</button>
+    </div>
+  </section>
+
+  <!-- ============================== SHEET ============================== -->
+  <section class="sheet" id="sheet" aria-live="polite">
+    <div class="empty" id="empty">
+      <p>Fill in the brief and hit <b>Write it</b>.</p>
+      <p class="small">You'll get four things: a title, the Style field, the Exclude field, and a lyric sheet with the section tags already in place. Everything is built from the genre and artist tables in this folder — nothing is fetched, nothing is sent anywhere.</p>
+    </div>
+
+    <div id="result" hidden>
+
+      <div class="stamp">
+        <span class="stamp-model" id="out-model">V5.5</span>
+        <span class="stamp-meta" id="out-meta"></span>
+      </div>
+
+      <div class="out">
+        <div class="out-head">
+          <h3>Title</h3>
+          <button class="copy" data-copy="out-title" type="button">copy</button>
+        </div>
+        <div class="box title-box" id="out-title"></div>
+      </div>
+
+      <div class="out">
+        <div class="out-head">
+          <h3>Style</h3>
+          <span class="count" id="style-count"></span>
+          <button class="linky" id="toggle-tags" type="button">tag version</button>
+          <button class="copy" data-copy="out-style" type="button">copy</button>
+        </div>
+        <div class="box mono" id="out-style"></div>
+      </div>
+
+      <div class="out">
+        <div class="out-head">
+          <h3>Exclude styles</h3>
+          <button class="copy" data-copy="out-exclude" type="button">copy</button>
+        </div>
+        <div class="box mono" id="out-exclude"></div>
+      </div>
+
+      <div class="out">
+        <div class="out-head">
+          <h3>Lyrics</h3>
+          <span class="count" id="lyric-count"></span>
+          <button class="linky" id="toggle-syl" type="button">syllables</button>
+          <button class="copy" data-copy="out-lyrics" type="button">copy</button>
+        </div>
+        <pre class="box lyrics" id="out-lyrics"></pre>
+      </div>
+
+      <div class="out">
+        <div class="out-head"><h3>Checks</h3></div>
+        <ul class="checks" id="out-checks"></ul>
+      </div>
+
+      <div class="out">
+        <div class="out-head"><h3>How to run it</h3></div>
+        <ol class="howto" id="out-howto"></ol>
+      </div>
+
+      <div class="actions bottom">
+        <button class="ghost" id="save" type="button">Save to sheet</button>
+        <button class="ghost" id="export" type="button">Download .txt</button>
+        <button class="ghost" id="reroll-lyrics" type="button">New lyric, same style</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ============================== LIBRARY ============================== -->
+<div class="drawer" id="drawer" hidden>
+  <div class="drawer-in">
+    <div class="drawer-head">
+      <h2>Saved</h2>
+      <button class="ghost" id="close-library" type="button">close</button>
+    </div>
+    <ul id="lib-list" class="lib"></ul>
+  </div>
+</div>
+
+<footer class="foot">
+  <p>Built on the v5 / v5.5 prompting rules: the Style field caps at 1000 characters and weights its opening hardest, brackets belong in the lyrics and not the style box, tempo and key read best as plain tags, exclusions belong in the Exclude field and work best at two or three, and artist names are blocked outright — so this describes the sound instead.</p>
+</footer>
+
+<script src="data-genres.js"></script>
+<script src="data-artists.js"></script>
+<script src="data-lexicon.js"></script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
