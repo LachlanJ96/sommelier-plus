@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Clocktower Companion</title>
+<meta name="theme-color" content="#0d0a0b">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="sigil">✦</span> Clocktower Companion</div>
+  <div class="game-meta">
+    <span id="gameName" class="game-name"></span>
+    <span id="scriptName" class="pill"></span>
+  </div>
+  <div class="phase">
+    <button id="phasePrev" class="icon-btn" title="Previous phase">‹</button>
+    <span id="phaseLabel" class="phase-label"></span>
+    <button id="phaseNext" class="icon-btn" title="Next phase">›</button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="grim" class="active">Grimoire</button>
+  <button data-tab="log">Log</button>
+  <button data-tab="script">Script</button>
+  <button data-tab="ai">AI Analyst</button>
+  <button data-tab="games">Games</button>
+</nav>
+
+<main>
+  <!-- GRIMOIRE -->
+  <section id="tab-grim" class="tab active">
+    <div class="grim-layout">
+      <div class="circle-wrap"><div id="circle" class="circle"></div></div>
+      <aside id="seatPanel" class="panel seat-panel"></aside>
+    </div>
+  </section>
+
+  <!-- LOG -->
+  <section id="tab-log" class="tab">
+    <div class="log-layout">
+      <div class="panel">
+        <h2>Record</h2>
+        <div class="seg" id="logTypeSeg">
+          <button data-type="nomination" class="active">Nomination</button>
+          <button data-type="death">Death</button>
+          <button data-type="info">Info / claim</button>
+          <button data-type="note">Note</button>
+        </div>
+        <form id="logForm" class="stack"></form>
+      </div>
+      <div class="panel">
+        <h2>Game timeline</h2>
+        <div id="timeline"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCRIPT -->
+  <section id="tab-script" class="tab">
+    <div class="panel">
+      <div class="row between wrap">
+        <h2 id="scriptTitle">Script</h2>
+        <div class="row gap wrap">
+          <select id="scriptSwitch" style="width:auto;margin:0" title="Script for this game"></select>
+          <button id="btnImportScript" class="btn">Import script JSON</button>
+          <button id="btnBuildScript" class="btn">Build custom script</button>
+        </div>
+      </div>
+      <div id="scriptNotice"></div>
+      <div id="distTable"></div>
+      <div id="scriptSheet"></div>
+    </div>
+  </section>
+
+  <!-- AI -->
+  <section id="tab-ai" class="tab">
+    <div class="ai-layout">
+      <div class="panel ai-settings">
+        <h2>Analyst setup</h2>
+        <label>Anthropic API key
+          <input id="apiKey" type="password" placeholder="sk-ant-…" autocomplete="off">
+        </label>
+        <p class="hint">Stored only in this browser. Calls go straight from your browser to the Anthropic API. No key? Use “Copy prompt” and paste it into Claude.</p>
+        <label>Model
+          <select id="model">
+            <option value="claude-opus-5-5">Claude Opus 5.5 (deepest)</option>
+            <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (balanced)</option>
+            <option value="claude-haiku-5-5">Claude Haiku 5.5 (fast)</option>
+          </select>
+        </label>
+        <h3>Quick analyses</h3>
+        <div class="quick" id="quickPrompts"></div>
+        <div class="row gap wrap">
+          <button id="btnCopyPrompt" class="btn ghost">Copy prompt</button>
+          <button id="btnClearChat" class="btn ghost">Clear chat</button>
+        </div>
+      </div>
+      <div class="panel chat-panel">
+        <div id="chat" class="chat"></div>
+        <form id="chatForm" class="chat-form">
+          <textarea id="chatInput" rows="2" placeholder="Ask anything about this game… e.g. “If Sarah is the Drunk, who is the Demon?”"></textarea>
+          <button class="btn primary" id="chatSend">Ask</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- GAMES -->
+  <section id="tab-games" class="tab">
+    <div class="games-layout">
+      <div class="panel">
+        <h2>New game</h2>
+        <form id="newGameForm" class="stack">
+          <label>Game name <input name="name" placeholder="Friday night"></label>
+          <label>Script <select name="script" id="newGameScript"></select></label>
+          <label>I am the…
+            <select name="mode">
+              <option value="player">Player (track claims &amp; suspicions)</option>
+              <option value="storyteller">Storyteller (track true roles)</option>
+            </select>
+          </label>
+          <label>Players, in seat order clockwise (one per line)
+            <textarea name="players" rows="8" placeholder="Alex&#10;Sam&#10;Jordan&#10;…"></textarea>
+          </label>
+          <button class="btn primary">Start game</button>
+        </form>
+      </div>
+      <div class="panel">
+        <h2>Saved games</h2>
+        <div id="gameList"></div>
+        <div class="row gap wrap mt">
+          <button id="btnExport" class="btn ghost">Export all</button>
+          <label class="btn ghost file-btn">Import<input type="file" id="importFile" accept=".json,application/json" hidden></label>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog id="modal"><div id="modalBody"></div></dialog>
+<div id="toast" class="toast"></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
