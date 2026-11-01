@@ -12,7 +12,46 @@ function loadStore() {
 }
 let store = loadStore();
 store.customScripts ||= {}; store.customChars ||= {}; store.settings ||= { model: 'claude-sonnet-5-5' };
-function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { toast('Could not save: ' + e.message); } }
+function save() { store.savedAt = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(store)); } catch {} scheduleSync(); }
+
+// Cloud sync: when hosted on claude.ai, each user's games are kept in a private store.
+let cloud = null, syncTimer = null; const synced = {};
+function cloudDocs() {
+  const docs = { meta: { savedAt: store.savedAt || 0, currentGameId: store.currentGameId, model: store.settings.model, customScripts: store.customScripts, customChars: store.customChars, order: store.games.map(g => g.id) } };
+  for (const g of store.games) docs['g_' + g.id] = { ...g, chat: (g.chat || []).slice(-30) };
+  return docs;
+}
+function scheduleSync() { if (!cloud) return; clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 1200); }
+async function syncNow() {
+  if (!cloud) return;
+  const docs = cloudDocs();
+  for (const [k, v] of Object.entries(docs)) {
+    const j = JSON.stringify(v); if (synced[k] === j) continue;
+    try { await cloud.col.doc(k).set(JSON.parse(j)); synced[k] = j; } catch (e) { console.warn('sync', k, e); }
+  }
+  for (const k of Object.keys(synced)) if (!(k in docs)) { try { await cloud.col.doc(k).delete(); delete synced[k]; } catch {} }
+}
+async function initCloud() {
+  if (!window.claude?.use) return;
+  try {
+    const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
+    if (!db || !user) return;
+    const id = await user.id(); if (!id) return;
+    const col = db.collection('data/users/' + id);
+    const snap = await Promise.race([col.get(), new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 10000))]);
+    const byId = Object.fromEntries(snap.docs.filter(d => d.exists).map(d => [d.id, structuredClone(d.data())]));
+    cloud = { col };
+    for (const [k, v] of Object.entries(byId)) synced[k] = JSON.stringify(v);
+    const meta = byId.meta;
+    if (meta && (meta.savedAt || 0) > (store.savedAt || 0)) {
+      const games = (meta.order || []).map(gid => byId['g_' + gid]).filter(Boolean);
+      store = { ...store, games, currentGameId: meta.currentGameId, customScripts: meta.customScripts || {}, customChars: meta.customChars || {}, savedAt: meta.savedAt, settings: { ...store.settings, model: meta.model || store.settings.model } };
+      try { localStorage.setItem(KEY, JSON.stringify(store)); } catch {}
+      if (!game() && currentTab !== 'games') goTab('games'); else renderAll();
+      toast('Games synced');
+    } else scheduleSync();
+  } catch (e) { console.warn('cloud unavailable', e); }
+}
 
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2200); }
 
@@ -128,7 +167,7 @@ function renderGrim() {
   });
   circle.innerHTML = html;
   circle.querySelectorAll('.token').forEach(t => t.onclick = () => { selectedSeat = t.dataset.id; renderGrim(); });
-  $('#addPlayer').onclick = () => { const name = prompt('Player name?'); if (name) { g.players.push({ id: uid(), name, claim: '', role: '', alive: true, ghostVote: true, alignment: 'unknown', suspicion: 0, notes: '', isMe: false, diedPhase: null }); save(); renderGrim(); } };
+  $('#addPlayer').onclick = async () => { const name = await uiPrompt('Player name'); if (name) { g.players.push({ id: uid(), name, claim: '', role: '', alive: true, ghostVote: true, alignment: 'unknown', suspicion: 0, notes: '', isMe: false, diedPhase: null }); save(); renderGrim(); } };
   renderSeatPanel();
 }
 new ResizeObserver(() => currentTab === 'grim' && renderGrim()).observe($('#circle'));
@@ -193,7 +232,7 @@ function renderSeatPanel() {
   $('#mvL').onclick = () => move(-1); $('#mvR').onclick = () => move(1);
   function move(d) { const i = g.players.indexOf(p), j = (i + d + g.players.length) % g.players.length; [g.players[i], g.players[j]] = [g.players[j], g.players[i]]; save(); renderGrim(); }
   $('#logInfo').onclick = () => { logType = 'info'; logPrefill = p.id; goTab('log'); };
-  $('#rmP').onclick = () => { if (confirm('Remove ' + p.name + '?')) { g.players = g.players.filter(x => x !== p); selectedSeat = null; save(); renderGrim(); } };
+  $('#rmP').onclick = async () => { if (await uiConfirm('Remove ' + p.name + ' from the game?', 'Remove')) { g.players = g.players.filter(x => x !== p); selectedSeat = null; save(); renderGrim(); } };
 }
 function myRoleBox(g) {
   if (!g || g.mode !== 'player') return '';
@@ -327,12 +366,28 @@ function buildScript(existingId) {
     e.preventDefault(); const ids = [...$('#bsL').querySelectorAll('input:checked')].map(i => i.value); if (!ids.length) return toast('Pick some characters');
     const id = existingId && existingId !== '__tmp' ? existingId : 'c_' + uid();
     store.customScripts[id] = { id, name: $('#bsN').value || 'Custom script', author: 'Me', characters: ids, editable: true };
-    const g = game(); if (g && confirm('Use this script for the current game?')) g.scriptId = id;
+    const g = game(); if (g) g.scriptId = id;
     save(); closeModal(); renderAll(); toast('Script saved');
   };
 }
 
 // ================= Modal =================
+function uiConfirm(msg, ok = 'Delete') {
+  return new Promise(res => {
+    openModal(`<p>${esc(msg)}</p><div class="row gap"><button class="btn danger" id="cfY">${esc(ok)}</button><button class="btn ghost" id="cfN">Cancel</button></div>`);
+    $('#cfY').onclick = () => { closeModal(); res(true); }; $('#cfN').onclick = () => { closeModal(); res(false); };
+    $('#modal').addEventListener('close', () => res(false), { once: true });
+  });
+}
+function uiPrompt(msg, value = '') {
+  return new Promise(res => {
+    openModal(`<form id="upF" class="stack"><label>${esc(msg)} <input id="upI" value="${esc(value)}" autocomplete="off"></label><div class="row gap"><button class="btn primary">Save</button><button type="button" class="btn ghost" id="upN">Cancel</button></div></form>`);
+    $('#upI').focus();
+    $('#upF').onsubmit = e => { e.preventDefault(); const v = $('#upI').value.trim(); closeModal(); res(v || null); };
+    $('#upN').onclick = () => { closeModal(); res(null); };
+    $('#modal').addEventListener('close', () => res(null), { once: true });
+  });
+}
 function openModal(html) { $('#modalBody').innerHTML = html; $('#modal').showModal(); }
 function closeModal() { $('#modal').close(); }
 window.closeModal = closeModal; window.goTab = goTab;
@@ -347,13 +402,13 @@ function renderGames() {
     <button class="btn small" data-open="${g.id}">Open</button><button class="btn small" data-ren="${g.id}">Rename</button><button class="btn small danger" data-del="${g.id}">✕</button></div>`).join('') : '<p class="hint">No saved games.</p>';
   const custom = Object.values(store.customScripts).filter(s => !BUILTIN_SCRIPTS.some(b => b.id === s.id));
   if (custom.length) $('#gameList').innerHTML += `<h3>Custom scripts</h3>` + custom.map(s => `<div class="game-item"><div class="info"><b>${esc(s.name)}</b><small>${s.characters.length} characters</small></div><button class="btn small" data-edit="${s.id}">Edit</button><button class="btn small danger" data-sdel="${s.id}">✕</button></div>`).join('');
-  $('#gameList').onclick = e => {
+  $('#gameList').onclick = async e => {
     const b = e.target.closest('button'); if (!b) return; const d = b.dataset;
     if (d.open) { store.currentGameId = d.open; selectedSeat = null; save(); goTab('grim'); }
-    if (d.ren) { const g = store.games.find(x => x.id === d.ren), n = prompt('Rename game', g.name); if (n) { g.name = n; save(); renderAll(); } }
-    if (d.del && confirm('Delete this game?')) { store.games = store.games.filter(x => x.id !== d.del); if (store.currentGameId === d.del) store.currentGameId = store.games[0]?.id || null; save(); renderAll(); }
+    if (d.ren) { const g = store.games.find(x => x.id === d.ren), n = await uiPrompt('Game name', g.name); if (n) { g.name = n; save(); renderAll(); } }
+    if (d.del && await uiConfirm('Delete this game? This cannot be undone.')) { store.games = store.games.filter(x => x.id !== d.del); if (store.currentGameId === d.del) store.currentGameId = store.games[0]?.id || null; save(); renderAll(); }
     if (d.edit) buildScript(d.edit);
-    if (d.sdel && confirm('Delete this custom script?')) { delete store.customScripts[d.sdel]; save(); renderAll(); }
+    if (d.sdel && await uiConfirm('Delete this custom script?')) { delete store.customScripts[d.sdel]; save(); renderAll(); }
   };
 }
 $('#newGameForm').onsubmit = e => {
@@ -364,8 +419,11 @@ $('#newGameForm').onsubmit = e => {
   e.target.reset(); selectedSeat = null; goTab('grim');
   if (getScript(game().scriptId).needsImport) setTimeout(() => toast('Remember to import this script\'s JSON on the Script tab'), 600);
 };
-$('#btnExport').onclick = () => {
-  const blob = new Blob([JSON.stringify({ ...store, settings: { model: store.settings.model } }, null, 2)], { type: 'application/json' });
+$('#btnExport').onclick = async () => {
+  const data = JSON.stringify({ ...store, settings: { model: store.settings.model } }, null, 2);
+  const dl = window.claude?.use ? await claude.use('downloads') : null;
+  if (dl) { try { await dl.save({ filename: 'clocktower-games.json', data }); toast('Saved'); } catch (e) { if (e?.code !== 'cancelled') toast('Export failed: ' + (e?.message || e)); } return; }
+  const blob = new Blob([data], { type: 'application/json' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'clocktower-games.json'; a.click(); URL.revokeObjectURL(a.href);
 };
 $('#importFile').onchange = async e => {
@@ -430,6 +488,10 @@ function gameStateText() {
   }
   return s;
 }
+let _sample;
+function sampleFn() { if (_sample === undefined) _sample = window.claude?.use ? claude.use('sample').catch(() => null) : Promise.resolve(null); return _sample; }
+sampleFn().then(s => { if (s) { document.body.classList.add('hosted'); renderAiSetup(); } });
+function renderAiSetup() { const h = $('#aiHosted'); if (h) h.hidden = !document.body.classList.contains('hosted'); }
 function systemPrompt() {
   return `You are an expert Blood on the Clocktower analyst helping a user in a live game. You know the rules deeply: droisoning (drunk/poisoned players get false info), registration (Recluse, Spy), madness, bluffs, the Demon's three not-in-play bluffs, Outsider-count modifiers, night order, and common evil strategies.
 Reason from the script and the logged evidence below. Treat every claim as possibly a lie, and explicitly consider who could be drunk or poisoned. Be concrete: name players, give probabilities, and show which pieces of information are load-bearing. Use only characters on this script unless a character could have been created mid-game (e.g. Pit-Hag) or joined as a Traveller. If information is missing, say what the user should find out. Keep answers well-structured with short headings and bullet points; avoid padding. Never pretend to know hidden information you were not given.
@@ -472,14 +534,20 @@ let busy = false;
 async function ask(question) {
   const g = game(); if (!g) return toast('Start a game first');
   if (busy) return;
-  const key = store.settings.apiKey;
-  if (!key) { await copyPrompt(question); return; }
+  const key = store.settings.apiKey, sample = await sampleFn();
+  if (!sample && !key) { await copyPrompt(question); return; }
   g.chat.push({ role: 'user', content: question });
   const reply = { role: 'assistant', content: '' }; g.chat.push(reply); renderChat();
   busy = true; $('#chatSend').disabled = true; $('#chatSend').textContent = '…';
   const msgEl = $('#chat').lastElementChild; msgEl.innerHTML = '<i>Consulting the grimoire…</i>';
   try {
     const messages = g.chat.filter(m => m !== reply && !m.error && m.content).map(m => ({ role: m.role, content: m.content })).slice(-20);
+    while (messages.length && messages[0].role !== 'user') messages.shift();
+    if (sample) {
+      const input = messages.map((m, i) => i === messages.length - 1 ? { role: 'user', content: systemPrompt() + '\n\n# Question\n' + m.content } : m);
+      const r = await sample(input, { modelTier: 'complex', cache: false, onText: ({ text }) => { reply.content = text; msgEl.innerHTML = md(text); $('#chat').scrollTop = $('#chat').scrollHeight; } });
+      reply.content = r.text;
+    } else {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
@@ -496,7 +564,12 @@ async function ask(question) {
         try { const ev = JSON.parse(line.slice(5)); if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') { reply.content += ev.delta.text; msgEl.innerHTML = md(reply.content); $('#chat').scrollTop = $('#chat').scrollHeight; } if (ev.type === 'error') throw new Error(ev.error?.message || 'Stream error'); } catch (e) { if (e.message && !(e instanceof SyntaxError)) throw e; }
       }
     }
-  } catch (err) { reply.content = 'Request failed — ' + err.message; reply.error = true; }
+    }
+  } catch (err) {
+    if (err?.code === 'not_granted') { reply.content = 'Claude access was declined for this page. Allow it from the page’s permissions to use the analyst, or use “Copy prompt”.'; reply.error = true; }
+    else if (err?.text) reply.content = err.text;
+    else { reply.content = 'Request failed. ' + (err?.message || err); reply.error = true; }
+  }
   busy = false; $('#chatSend').disabled = false; $('#chatSend').textContent = 'Ask';
   save(); renderChat();
 }
@@ -507,7 +580,7 @@ async function copyPrompt(question) {
   catch { openModal(`<h2>Copy this prompt</h2><textarea rows="18" readonly>${esc(text)}</textarea><button class="btn mt" onclick="closeModal()">Close</button>`); }
 }
 $('#btnCopyPrompt').onclick = () => copyPrompt();
-$('#btnClearChat').onclick = () => { const g = game(); if (g && confirm('Clear the chat for this game?')) { g.chat = []; save(); renderChat(); } };
+$('#btnClearChat').onclick = async () => { const g = game(); if (g && await uiConfirm('Clear the analyst chat for this game?', 'Clear')) { g.chat = []; save(); renderChat(); } };
 $('#chatForm').onsubmit = e => { e.preventDefault(); const q = $('#chatInput').value.trim(); if (!q) return; $('#chatInput').value = ''; ask(q); };
 $('#chatInput').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#chatForm').requestSubmit(); } };
 
@@ -521,3 +594,4 @@ function renderAll() {
   if (currentTab === 'games') renderGames();
 }
 if (!game()) { goTab('games'); } else renderAll();
+initCloud();

@@ -149,3 +149,7 @@ dialog::backdrop{background:rgba(0,0,0,.7)}
   .game-meta{order:3;flex-basis:100%}
 }
 #distTable{overflow-x:auto}
+body.hosted .key-setup{display:none}
+:root{color-scheme:dark}
+.topbar{top:env(safe-area-inset-top,0px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.tabs,main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}

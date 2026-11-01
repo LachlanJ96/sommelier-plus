@@ -82,6 +82,8 @@
     <div class="ai-layout">
       <div class="panel ai-settings">
         <h2>Analyst setup</h2>
+        <p id="aiHosted" class="notice" hidden>Running on claude.ai: the analyst uses your Claude account. The first question asks you to allow it.</p>
+        <div class="key-setup">
         <label>Anthropic API key
           <input id="apiKey" type="password" placeholder="sk-ant-…" autocomplete="off">
         </label>
@@ -93,6 +95,7 @@
             <option value="claude-haiku-5-5">Claude Haiku 5.5 (fast)</option>
           </select>
         </label>
+        </div>
         <h3>Quick analyses</h3>
         <div class="quick" id="quickPrompts"></div>
         <div class="row gap wrap">
